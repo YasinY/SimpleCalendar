@@ -25,12 +25,7 @@ Mein persönlicher Kalender für Windows, im Mac-Look. Die Windows-Kalender-App 
 
 ## Installation
 
-```bash
-npm install
-npm run dist
-```
-
-Der Installer liegt danach in `dist/`. Die App startet nach der Installation automatisch mit Windows und lebt im Tray. Schließen blendet das Fenster nur aus, Beenden geht über das Tray-Menü.
+Installer aus dem aktuellen [Release](../../releases/latest) herunterladen und ausführen. Die App startet nach der Installation automatisch mit Windows und lebt im Tray. Schließen blendet das Fenster nur aus, Beenden geht über das Tray-Menü.
 
 > !!Der Installer ist nicht signiert, Windows SmartScreen fragt beim ersten Start nach!!
 
