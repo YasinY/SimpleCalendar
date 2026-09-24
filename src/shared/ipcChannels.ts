@@ -1,0 +1,10 @@
+export const IPC_CHANNELS = {
+  GET_EVENTS: 'events:get',
+  SAVE_EVENT: 'events:save',
+  DELETE_EVENT: 'events:delete',
+  GET_SETTINGS: 'settings:get',
+  UPDATE_SETTINGS: 'settings:update',
+  WINDOW_MINIMIZE: 'window:minimize',
+  WINDOW_TOGGLE_MAXIMIZE: 'window:toggle-maximize',
+  WINDOW_HIDE: 'window:hide'
+} as const;

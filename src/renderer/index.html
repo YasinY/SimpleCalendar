@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self' https://geocoding-api.open-meteo.com https://api.open-meteo.com">
+  <title>Kalender</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="titlebar">
+      <div class="traffic-lights">
+        <button type="button" class="traffic-light traffic-light--close" id="windowClose" aria-label="Fenster ausblenden"></button>
+        <button type="button" class="traffic-light traffic-light--minimize" id="windowMinimize" aria-label="Minimieren"></button>
+        <button type="button" class="traffic-light traffic-light--maximize" id="windowMaximize" aria-label="Maximieren"></button>
+      </div>
+      <h1 class="titlebar__title">
+        <span class="titlebar__month" id="monthName"></span>
+        <span class="titlebar__year" id="yearLabel"></span>
+      </h1>
+      <nav class="segmented" aria-label="Ansicht" id="viewSwitcher">
+        <button type="button" class="segmented__button segmented__button--text" data-view-mode="month">Monat</button>
+        <button type="button" class="segmented__button segmented__button--text" data-view-mode="week">Woche</button>
+        <button type="button" class="segmented__button segmented__button--text" data-view-mode="day">Tag</button>
+      </nav>
+      <button type="button" class="segmented__button icon-button" id="settingsButton" aria-label="Einstellungen" title="Einstellungen">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+      <div class="weather" id="weatherBadge" hidden>
+        <span class="weather__icon" data-weather-icon></span>
+        <span class="weather__temp" data-weather-temp></span>
+        <span class="weather__label" data-weather-label></span>
+      </div>
+      <nav class="segmented segmented--trailing" aria-label="Navigation">
+        <button type="button" class="segmented__button" id="previousPeriod" aria-label="Zurück">&#8249;</button>
+        <button type="button" class="segmented__button segmented__button--text" id="todayButton">Heute</button>
+        <button type="button" class="segmented__button" id="nextPeriod" aria-label="Weiter">&#8250;</button>
+      </nav>
+    </header>
+
+    <main class="calendar" id="calendar"></main>
+  </div>
+
+  <div class="overlay" id="dialogOverlay" hidden>
+    <div class="overlay__drag-strip"></div>
+    <form class="dialog" data-dialog-form novalidate>
+      <header class="dialog__header">
+        <h2 class="dialog__heading" data-dialog-heading></h2>
+        <p class="dialog__subheading" data-dialog-date></p>
+      </header>
+
+      <label class="field">
+        <span class="field__label">Titel</span>
+        <input class="field__input" type="text" data-dialog-title autofocus maxlength="120" placeholder="Neues Ereignis">
+      </label>
+
+      <div class="field-row">
+        <label class="field">
+          <span class="field__label">Von</span>
+          <input class="field__input" type="time" data-dialog-time value="09:00">
+        </label>
+
+        <label class="field">
+          <span class="field__label">Bis (optional)</span>
+          <input class="field__input" type="time" data-dialog-end-time>
+        </label>
+      </div>
+
+      <label class="checkbox">
+        <input class="checkbox__input" type="checkbox" data-dialog-all-day>
+        <span class="checkbox__label">Ganztägig</span>
+      </label>
+
+      <div class="field" role="radiogroup" aria-label="Farbe">
+        <span class="field__label">Farbe</span>
+        <div class="swatches" data-dialog-colors></div>
+      </div>
+
+      <label class="field">
+        <span class="field__label">Erinnerung</span>
+        <select class="field__input field__input--select" data-dialog-reminder></select>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Notiz (optional)</span>
+        <textarea class="field__input field__input--textarea" data-dialog-notes rows="3" maxlength="500" placeholder="Details, Ort, Links …"></textarea>
+      </label>
+
+      <footer class="dialog__footer">
+        <button type="button" class="button button--danger" data-dialog-delete hidden>Löschen</button>
+        <span class="dialog__spacer"></span>
+        <button type="button" class="button" data-dialog-cancel>Abbrechen</button>
+        <button type="submit" class="button button--primary" data-dialog-submit>Hinzufügen</button>
+      </footer>
+    </form>
+  </div>
+
+  <div class="overlay" id="settingsOverlay" hidden>
+    <div class="overlay__drag-strip"></div>
+    <form class="dialog" data-settings-form novalidate>
+      <h2 class="dialog__heading">Einstellungen</h2>
+
+      <label class="field">
+        <span class="field__label">Bundesland für Feiertage</span>
+        <select class="field__input field__input--select" data-settings-region></select>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Erscheinungsbild</span>
+        <select class="field__input field__input--select" data-settings-theme></select>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Stadt für das Wetter (leer lassen für aus)</span>
+        <input class="field__input" type="text" data-settings-city maxlength="80" placeholder="z. B. Hamburg">
+      </label>
+
+      <footer class="dialog__footer">
+        <span class="dialog__spacer"></span>
+        <button type="button" class="button" data-settings-cancel>Abbrechen</button>
+        <button type="submit" class="button button--primary">Sichern</button>
+      </footer>
+    </form>
+  </div>
+
+  <div class="overlay overlay--prompt" id="discardOverlay" hidden>
+    <div class="dialog dialog--prompt" role="alertdialog" aria-labelledby="discardHeading" aria-describedby="discardMessage">
+      <h2 class="dialog__heading" id="discardHeading">Änderungen verwerfen?</h2>
+      <p class="dialog__message" id="discardMessage">Deine Eingaben gehen verloren, wenn du den Dialog jetzt schließt.</p>
+      <footer class="dialog__footer">
+        <span class="dialog__spacer"></span>
+        <button type="button" class="button" data-discard-keep>Weiter bearbeiten</button>
+        <button type="button" class="button button--danger" data-discard-confirm>Verwerfen</button>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

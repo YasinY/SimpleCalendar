@@ -1,0 +1,62 @@
+{
+  "name": "simplecalendar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Persönlicher Kalender für Windows mit Feiertagen, Wetter und Erinnerungen, lokal gespeichert im Tray",
+  "author": "yasin@yazici.dev",
+  "license": "MIT",
+  "main": "out/main/main.js",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/dev.mjs",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit-main --project unit-renderer",
+    "test:integration": "vitest run --project integration-main --project integration-renderer",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage --coverage.reporter=text --coverage.reporter=html",
+    "test:e2e": "npm run build && playwright test",
+    "check": "npm run typecheck && npm run test:coverage && npm run test:e2e",
+    "dist": "npm run build && electron-builder --win",
+    "generate-tray-icon": "node scripts/generateTrayIcon.js",
+    "db:generate": "drizzle-kit generate"
+  },
+  "build": {
+    "appId": "dev.yazici.simplecalendar",
+    "productName": "SimpleCalendar",
+    "files": [
+      "out/**/*",
+      "assets/**/*",
+      "drizzle/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
+    }
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.13.5",
+    "@vitest/coverage-v8": "^5.0.1",
+    "drizzle-kit": "^1.0.0-rc.4",
+    "drizzle-orm": "^1.0.0-rc.4",
+    "electron": "^44.4.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "happy-dom": "^20.14.5",
+    "monocart-coverage-reports": "^2.13.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}
