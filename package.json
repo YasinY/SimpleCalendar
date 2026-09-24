@@ -21,7 +21,7 @@
     "test:coverage": "vitest run --coverage --coverage.reporter=text --coverage.reporter=html",
     "test:e2e": "npm run build && playwright test",
     "check": "npm run typecheck && npm run test:coverage && npm run test:e2e",
-    "dist": "npm run build && electron-builder --win",
+    "dist": "npm run build && electron-builder --win --publish never",
     "generate-tray-icon": "node scripts/generateTrayIcon.js",
     "db:generate": "drizzle-kit generate"
   },
