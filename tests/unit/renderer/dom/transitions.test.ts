@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { runWithTransition } from '../../../../src/renderer/dom/transitions';
-import { REDUCED_MOTION_QUERY, TRANSITION_DATASET_KEY, TRANSITION_DIRECTIONS } from '../../../../src/renderer/constants';
+import { runWithTransition } from '@renderer/dom/transitions';
+import { REDUCED_MOTION_QUERY, TRANSITION_DATASET_KEY, TRANSITION_DIRECTIONS } from '@renderer/constants';
 
 const START_VIEW_TRANSITION = 'startViewTransition';
 const DIRECTION = TRANSITION_DIRECTIONS.FORWARD;

@@ -1,4 +1,4 @@
-import type { WeatherLocation } from '../../shared/weatherLocation';
+import type { WeatherLocation } from '@shared/weatherLocation';
 
 export interface WeatherPresenter {
   start(): void;

@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import { normalizeStoredEvent } from './eventNormalization';
 import { readJsonFile } from './jsonFile';
-import { LEGACY_EVENTS_MIGRATED_SUFFIX } from '../constants';
+import { LEGACY_EVENTS_MIGRATED_SUFFIX } from '@main/constants';
 import type { EventStore } from './EventStore';
-import type { CalendarEvent } from '../../shared/calendarEvent';
+import type { CalendarEvent } from '@shared/calendarEvent';
 
 export function importLegacyEvents(store: EventStore, jsonPath: string): void {
   const parsed = readJsonFile<unknown>(jsonPath, null);

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchCurrentWeather, geocodeCity, resolveCondition } from '../../../../src/renderer/weather/weatherApi';
+import { fetchCurrentWeather, geocodeCity, resolveCondition } from '@renderer/weather/weatherApi';
 import {
   FORECAST_ENDPOINT,
   FORECAST_PARAMS,
@@ -7,8 +7,8 @@ import {
   GEOCODING_PARAMS,
   UNKNOWN_CONDITION,
   WEATHER_CONDITIONS
-} from '../../../../src/renderer/weather/weatherConstants';
-import type { WeatherLocation } from '../../../../src/shared/weatherLocation';
+} from '@renderer/weather/weatherConstants';
+import type { WeatherLocation } from '@shared/weatherLocation';
 
 const CITY = 'muenchen';
 const RESOLVED_NAME = 'München';

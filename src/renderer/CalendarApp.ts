@@ -2,6 +2,7 @@ import {
   CSS_CLASSES,
   DATASET_KEYS,
   DEFAULT_VIEW_MODE,
+  SERIES_SCOPES,
   TRANSITION_DIRECTIONS,
   VIEW_MODES,
   type TransitionDirection
@@ -9,25 +10,28 @@ import {
 import { buildDayColumns, buildMonthGrid, getWeekDays } from './date/dateUtils';
 import { VIEW_MODE_CONFIG, resolveViewMode, type ViewModeConfig } from './date/viewModes';
 import { runWithTransition } from './dom/transitions';
-import { groupByDate } from './events/eventGrouping';
+import { groupSegmentsByDate } from './events/eventGrouping';
+import { toEventKey } from './events/eventKey';
 import { moveEventTo } from './events/eventMove';
 import { buildHolidayMap } from './holidays/holidayDates';
 import type { CalendarAppFactories } from './calendarAppFactories';
 import type { CalendarElements } from './calendarElements';
 import type { EventEditor } from './dialogs/eventEditor';
+import type { ScopeChooser } from './dialogs/scopeChooser';
 import type { SettingsEditor } from './dialogs/settingsEditor';
 import type { SettingsPatch } from './dialogs/settingsPatch';
-import type { EventsByDate } from './views/eventsByDate';
 import type { MonthRenderer } from './views/monthRenderer';
 import type { MoveTarget } from './views/moveTarget';
+import type { SegmentsByDate } from './views/segmentsByDate';
 import type { TimeGridRenderer } from './views/timeGridRenderer';
 import type { WeatherPresenter } from './weather/weatherPresenter';
-import { DEFAULT_SETTINGS } from '../shared/settingsDefaults';
-import type { CalendarApi } from '../shared/calendarApi';
-import type { CalendarEvent } from '../shared/calendarEvent';
-import type { EventInput } from '../shared/eventInput';
-import type { Settings } from '../shared/settings';
-import type { ViewMode } from '../shared/viewMode';
+import { DEFAULT_SETTINGS } from '@shared/settingsDefaults';
+import type { CalendarApi } from '@shared/calendarApi';
+import type { CalendarEvent } from '@shared/calendarEvent';
+import type { EventInput } from '@shared/eventInput';
+import type { SeriesScope } from '@shared/seriesScope';
+import type { Settings } from '@shared/settings';
+import type { ViewMode } from '@shared/viewMode';
 
 const PREVIOUS_STEP = -1;
 const NEXT_STEP = 1;
@@ -39,6 +43,7 @@ export class CalendarApp {
   readonly #timeGridView: TimeGridRenderer;
   readonly #eventDialog: EventEditor;
   readonly #settingsDialog: SettingsEditor;
+  readonly #scopePrompt: ScopeChooser;
   readonly #weather: WeatherPresenter;
   #viewMode: ViewMode = DEFAULT_VIEW_MODE;
   #viewDate: Date = VIEW_MODE_CONFIG[DEFAULT_VIEW_MODE].normalize(new Date());
@@ -51,24 +56,26 @@ export class CalendarApp {
 
     this.#monthView = factories.createMonthView({
       onDayActivate: (isoDate) => this.#eventDialog.openForDate(isoDate),
-      onEventActivate: (eventId) => this.#openEvent(eventId),
-      onEventDrop: (eventId, target) => void this.#moveEvent(eventId, target)
+      onEventActivate: (eventKey) => this.#openEvent(eventKey),
+      onEventDrop: (eventKey, target) => void this.#moveEvent(eventKey, target)
     });
 
     this.#timeGridView = factories.createTimeGridView({
-      onEventActivate: (eventId) => this.#openEvent(eventId),
+      onEventActivate: (eventKey) => this.#openEvent(eventKey),
       onSlotActivate: (isoDate, time) => this.#eventDialog.openForDate(isoDate, time),
-      onEventDrop: (eventId, target) => void this.#moveEvent(eventId, target)
+      onEventDrop: (eventKey, target) => void this.#moveEvent(eventKey, target)
     });
 
     this.#eventDialog = factories.createEventDialog({
-      onSubmit: (payload) => void this.#saveEvent(payload),
-      onDelete: (eventId) => void this.#deleteEvent(eventId)
+      onSubmit: (payload, editing) => void this.#saveEvent(payload, editing),
+      onDelete: (event) => void this.#deleteEvent(event)
     });
 
     this.#settingsDialog = factories.createSettingsDialog({
       onSave: (patch) => void this.#saveSettings(patch)
     });
+
+    this.#scopePrompt = factories.createScopePrompt();
 
     this.#weather = factories.createWeatherBadge({
       onLocationResolved: (location) => void this.#api.updateSettings({ weatherLocation: location })
@@ -131,32 +138,48 @@ export class CalendarApp {
     void this.#reloadEvents(TRANSITION_DIRECTIONS.SWITCH);
   }
 
-  #openEvent(eventId: string): void {
-    const event = this.#findEvent(eventId);
+  #openEvent(eventKey: string): void {
+    const event = this.#findEvent(eventKey);
     if (!event) return;
     this.#eventDialog.openForEvent(event);
   }
 
-  #findEvent(eventId: string): CalendarEvent | undefined {
-    return this.#events.find((candidate) => candidate.id === eventId);
+  #findEvent(eventKey: string): CalendarEvent | undefined {
+    return this.#events.find((candidate) => toEventKey(candidate) === eventKey);
   }
 
-  async #moveEvent(eventId: string, target: MoveTarget): Promise<void> {
-    const event = this.#findEvent(eventId);
+  async #chooseScope(editing: CalendarEvent | null): Promise<SeriesScope | null> {
+    if (editing === null || editing.recurrence === null) return SERIES_SCOPES.SERIES;
+    return this.#scopePrompt.choose();
+  }
+
+  async #persist(input: EventInput, editing: CalendarEvent | null): Promise<boolean> {
+    const scope = await this.#chooseScope(editing);
+    if (scope === null) return false;
+    await (scope === SERIES_SCOPES.OCCURRENCE ? this.#api.saveOccurrence(input) : this.#api.saveEvent(input));
+    return true;
+  }
+
+  async #moveEvent(eventKey: string, target: MoveTarget): Promise<void> {
+    const event = this.#findEvent(eventKey);
     if (!event) return;
-    await this.#api.saveEvent(moveEventTo(event, target));
+    if (!(await this.#persist(moveEventTo(event, target), event))) return;
     await this.#reloadEvents();
   }
 
-  async #saveEvent(payload: EventInput): Promise<void> {
+  async #saveEvent(payload: EventInput, editing: CalendarEvent | null): Promise<void> {
     if (payload.title.length === 0) return;
-    await this.#api.saveEvent(payload);
+    if (!(await this.#persist(payload, editing))) return;
     this.#eventDialog.close();
     await this.#reloadEvents();
   }
 
-  async #deleteEvent(eventId: string): Promise<void> {
-    await this.#api.deleteEvent(eventId);
+  async #deleteEvent(event: CalendarEvent): Promise<void> {
+    const scope = await this.#chooseScope(event);
+    if (scope === null) return;
+    await (scope === SERIES_SCOPES.OCCURRENCE
+      ? this.#api.deleteOccurrence({ id: event.id, occurrenceDate: event.date })
+      : this.#api.deleteEvent(event.id));
     this.#eventDialog.close();
     await this.#reloadEvents();
   }
@@ -188,12 +211,12 @@ export class CalendarApp {
     const isMonthView = this.#viewMode === VIEW_MODES.MONTH;
     this.#mountView(isMonthView ? this.#monthView.element : this.#timeGridView.element);
 
-    const eventsByDate = groupByDate(this.#events);
+    const segmentsByDate = groupSegmentsByDate(this.#events);
     if (isMonthView) {
-      this.#renderMonth(eventsByDate);
+      this.#renderMonth(segmentsByDate);
       return;
     }
-    this.#renderTimeGrid(eventsByDate);
+    this.#renderTimeGrid(segmentsByDate);
   }
 
   #mountView(viewElement: HTMLElement): void {
@@ -202,15 +225,15 @@ export class CalendarApp {
     container.replaceChildren(viewElement);
   }
 
-  #renderMonth(eventsByDate: EventsByDate): void {
+  #renderMonth(segmentsByDate: SegmentsByDate): void {
     const grid = buildMonthGrid(this.#viewDate, new Date());
-    this.#monthView.render(grid, eventsByDate, buildHolidayMap(grid.years, this.#settings.holidayRegion));
+    this.#monthView.render(grid, segmentsByDate, buildHolidayMap(grid.years, this.#settings.holidayRegion));
   }
 
-  #renderTimeGrid(eventsByDate: EventsByDate): void {
+  #renderTimeGrid(segmentsByDate: SegmentsByDate): void {
     const dates = this.#viewMode === VIEW_MODES.WEEK ? getWeekDays(this.#viewDate) : [this.#viewDate];
     const layout = buildDayColumns(dates, new Date());
-    this.#timeGridView.render(layout, eventsByDate, buildHolidayMap(layout.years, this.#settings.holidayRegion));
+    this.#timeGridView.render(layout, segmentsByDate, buildHolidayMap(layout.years, this.#settings.holidayRegion));
   }
 
   #markActiveViewButton(): void {

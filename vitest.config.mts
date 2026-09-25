@@ -1,15 +1,29 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 const NODE_ENVIRONMENT = 'node';
 const DOM_ENVIRONMENT = 'happy-dom';
 const BOOTSTRAP_FILES = ['src/main/main.ts', 'src/main/preload.ts', 'src/renderer/app.ts'];
 const FULL_COVERAGE_PERCENT = 100;
+const PATH_ALIASES = {
+  '@shared': 'src/shared',
+  '@main': 'src/main',
+  '@renderer': 'src/renderer',
+  '@tests': 'tests'
+};
+
+function resolveAliases() {
+  return Object.fromEntries(
+    Object.entries(PATH_ALIASES).map(([alias, dir]) => [alias, fileURLToPath(new URL(dir, import.meta.url))])
+  );
+}
 
 function project(name: string, include: string[], environment: string) {
   return { test: { name, include, environment } };
 }
 
 export default defineConfig({
+  resolve: { alias: resolveAliases() },
   test: {
     projects: [
       project('unit-main', ['tests/unit/main/**/*.test.ts', 'tests/unit/shared/**/*.test.ts'], NODE_ENVIRONMENT),

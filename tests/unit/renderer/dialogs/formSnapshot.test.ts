@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captureFormState } from '../../../../src/renderer/dialogs/formSnapshot';
+import { captureFormState } from '@renderer/dialogs/formSnapshot';
 
 const STATE_SEPARATOR = '\u0000';
 const NON_VALUE_STATE = '';

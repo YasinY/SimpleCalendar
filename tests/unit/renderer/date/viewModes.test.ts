@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { toIsoDate } from '../../../../src/renderer/date/dateUtils';
-import { VIEW_MODE_CONFIG, resolveViewMode } from '../../../../src/renderer/date/viewModes';
+import { toIsoDate } from '@renderer/date/dateUtils';
+import { VIEW_MODE_CONFIG, resolveViewMode } from '@renderer/date/viewModes';
 
 const WEDNESDAY = new Date(2026, 8, 16);
 

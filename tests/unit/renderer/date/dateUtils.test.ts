@@ -23,7 +23,7 @@ import {
   toDateRange,
   toIsoDate,
   toMinutesOfDay
-} from '../../../../src/renderer/date/dateUtils';
+} from '@renderer/date/dateUtils';
 
 const WEDNESDAY = new Date(2026, 8, 16);
 const WEDNESDAY_AFTERNOON = new Date(2026, 8, 16, 14, 35);

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Menu, Tray, nativeImage, type MenuItemConstructorOptions } from 'electron';
-import { TRAY_ICON_PATH, TRAY_LABELS, TRAY_TOOLTIP } from '../../../../src/main/constants';
-import { TrayManager } from '../../../../src/main/tray/TrayManager';
+import { TRAY_ICON_PATH, TRAY_LABELS, TRAY_TOOLTIP } from '@main/constants';
+import { TrayManager } from '@main/tray/TrayManager';
 
 const CLICK_EVENT = 'click';
 const SEPARATOR_TYPE = 'separator';

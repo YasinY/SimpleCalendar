@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { APP_USER_MODEL_ID, HIDDEN_LAUNCH_FLAG, RENDERER_ENTRY_PATH, THEME_BACKGROUNDS } from '../../../src/main/constants';
-import { MainApplication } from '../../../src/main/MainApplication';
-import { openStorage } from '../../../src/main/storage/openStorage';
-import { IPC_CHANNELS } from '../../../src/shared/ipcChannels';
-import { DEFAULT_SETTINGS } from '../../../src/shared/settingsDefaults';
-import type { CalendarStorage } from '../../../src/main/storage/calendarStorage';
-import type { TrayManager } from '../../../src/main/tray/TrayManager';
-import type { Settings } from '../../../src/shared/settings';
-import { createCalendarEvent } from '../../support/calendarEventFactory';
+import { APP_USER_MODEL_ID, HIDDEN_LAUNCH_FLAG, RENDERER_ENTRY_PATH, THEME_BACKGROUNDS } from '@main/constants';
+import { MainApplication } from '@main/MainApplication';
+import { openStorage } from '@main/storage/openStorage';
+import { IPC_CHANNELS } from '@shared/ipcChannels';
+import { DEFAULT_SETTINGS } from '@shared/settingsDefaults';
+import type { CalendarStorage } from '@main/storage/calendarStorage';
+import type { TrayManager } from '@main/tray/TrayManager';
+import type { UpdateService } from '@main/updates/UpdateService';
+import type { Settings } from '@shared/settings';
+import { createCalendarEvent } from '@tests/support/calendarEventFactory';
 import {
   FakeBrowserWindow,
   FakeNotification,
@@ -22,10 +23,10 @@ import {
   themeListeners,
   webContentsListeners,
   windowListeners
-} from '../../support/electronMock';
+} from '@tests/support/electronMock';
 
-vi.mock('electron', async () => (await import('../../support/electronMock')).electronMock);
-vi.mock('../../../src/main/storage/openStorage', () => ({ openStorage: vi.fn() }));
+vi.mock('electron', async () => (await import('@tests/support/electronMock')).electronMock);
+vi.mock('@main/storage/openStorage', () => ({ openStorage: vi.fn() }));
 
 const USER_DATA_PATH = 'C:/user-data';
 const USER_DATA_PATH_NAME = 'userData';
@@ -49,8 +50,12 @@ const GONE_DETAILS = { reason: 'crashed' };
 const DATE_RANGE = { start: '2026-09-01', end: '2026-09-30' };
 const EVENT_ID = 'event-42';
 const EVENT_INPUT = { title: 'Meeting' };
+const TODAY = '2026-09-16';
+const OCCURRENCE_INPUT = { id: EVENT_ID, occurrenceDate: TODAY, title: 'Ausnahme' };
+const OCCURRENCE_REF = { id: EVENT_ID, occurrenceDate: TODAY };
+const NOW = new Date(2026, 8, 16, 9, 0, 0, 0);
 const DARK_THEME_PATCH: Partial<Settings> = { theme: 'dark' };
-const DUE_EVENT = createCalendarEvent({ date: '2026-09-16', time: '09:00', reminderMinutes: 0, notified: false });
+const DUE_EVENT = createCalendarEvent({ date: TODAY, time: '09:00', reminderMinutes: 0, notified: false });
 const DUE_EVENT_BODY = '16.09.2026 um 09:00 Uhr';
 const FIRST_INDEX = 0;
 
@@ -62,12 +67,14 @@ function createStorageStub() {
     events: {
       getBetween: vi.fn(() => []),
       save: vi.fn((input: unknown) => input),
+      saveOccurrence: vi.fn((input: unknown) => input),
       delete: vi.fn(),
-      getPendingReminders: vi.fn(() => [DUE_EVENT]),
+      deleteOccurrence: vi.fn(() => true),
+      getPendingReminders: vi.fn((_referenceDate: string) => [DUE_EVENT]),
       markNotified: vi.fn()
     },
     settings: {
-      getAll: vi.fn(() => DEFAULT_SETTINGS),
+      getAll: vi.fn((): Settings => DEFAULT_SETTINGS),
       update: vi.fn((patch: Partial<Settings>) => ({ ...DEFAULT_SETTINGS, ...patch }))
     }
   };
@@ -82,6 +89,10 @@ function createTrayStub() {
   };
 }
 
+function createUpdateServiceStub() {
+  return { start: vi.fn() };
+}
+
 function flushPromises(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
@@ -93,6 +104,7 @@ function mainWindow(): FakeBrowserWindow {
 const originalArgv = process.argv;
 let storage: StorageStub;
 let tray: ReturnType<typeof createTrayStub>;
+let updateService: ReturnType<typeof createUpdateServiceStub>;
 let application: MainApplication;
 
 async function startApplication(): Promise<void> {
@@ -102,14 +114,16 @@ async function startApplication(): Promise<void> {
 }
 
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+  vi.setSystemTime(NOW);
   vi.clearAllMocks();
   resetElectronMock();
   fakeApp.getPath.mockReturnValue(USER_DATA_PATH);
   storage = createStorageStub();
   vi.mocked(openStorage).mockReturnValue(storage as unknown as CalendarStorage);
   tray = createTrayStub();
-  application = new MainApplication(tray as unknown as TrayManager);
+  updateService = createUpdateServiceStub();
+  application = new MainApplication(tray as unknown as TrayManager, updateService as unknown as UpdateService);
 });
 
 afterEach(() => {
@@ -221,6 +235,21 @@ describe('MainApplication', () => {
 
       expect(mainWindow().setBackgroundColor).not.toHaveBeenCalled();
     });
+
+    it('starts the update service when automatic updates are enabled', async () => {
+      await startApplication();
+
+      expect(storage.settings.getAll).toHaveBeenCalledTimes(1);
+      expect(updateService.start).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not start the update service when automatic updates are disabled', async () => {
+      storage.settings.getAll.mockReturnValue({ ...DEFAULT_SETTINGS, autoUpdate: false });
+
+      await startApplication();
+
+      expect(updateService.start).not.toHaveBeenCalled();
+    });
   });
 
   describe('ipc handlers', () => {
@@ -239,10 +268,24 @@ describe('MainApplication', () => {
       expect(saved).toBe(EVENT_INPUT);
     });
 
+    it('saves a single occurrence', () => {
+      const saved = invokeListener(ipcHandlers, IPC_CHANNELS.SAVE_OCCURRENCE, {}, OCCURRENCE_INPUT);
+
+      expect(storage.events.saveOccurrence).toHaveBeenCalledWith(OCCURRENCE_INPUT);
+      expect(saved).toBe(OCCURRENCE_INPUT);
+    });
+
     it('deletes an event', () => {
       invokeListener(ipcHandlers, IPC_CHANNELS.DELETE_EVENT, {}, EVENT_ID);
 
       expect(storage.events.delete).toHaveBeenCalledWith(EVENT_ID);
+    });
+
+    it('deletes a single occurrence', () => {
+      const deleted = invokeListener(ipcHandlers, IPC_CHANNELS.DELETE_OCCURRENCE, {}, OCCURRENCE_REF);
+
+      expect(storage.events.deleteOccurrence).toHaveBeenCalledWith(OCCURRENCE_REF);
+      expect(deleted).toBe(true);
     });
 
     it('returns the settings', () => {
@@ -432,7 +475,8 @@ describe('MainApplication', () => {
       expect(FakeNotification.instances).toHaveLength(SINGLE_NOTIFICATION);
       expect(notification.options).toEqual({ title: DUE_EVENT.title, body: DUE_EVENT_BODY });
       expect(notification.show).toHaveBeenCalledTimes(1);
-      expect(storage.events.markNotified).toHaveBeenCalledWith(DUE_EVENT.id);
+      expect(storage.events.getPendingReminders).toHaveBeenCalledWith(TODAY);
+      expect(storage.events.markNotified).toHaveBeenCalledWith(DUE_EVENT.id, DUE_EVENT.date);
     });
   });
 });

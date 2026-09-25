@@ -1,4 +1,4 @@
-import { DRAG_DATA_TYPE, DROP_EFFECT_MOVE } from '../constants';
+import { DRAG_DATA_TYPE, DROP_EFFECT_MOVE } from '@renderer/constants';
 import type { DragPayload } from './dragPayload';
 
 export const DRAG_EVENTS = {

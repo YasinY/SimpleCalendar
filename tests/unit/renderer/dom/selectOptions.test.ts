@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fillSelect } from '../../../../src/renderer/dom/selectOptions';
-import type { SelectOption } from '../../../../src/renderer/selectOption';
+import { fillSelect } from '@renderer/dom/selectOptions';
+import type { SelectOption } from '@renderer/selectOption';
 
 const STALE_OPTION_VALUE = 'stale';
 const OPTIONS: SelectOption[] = [

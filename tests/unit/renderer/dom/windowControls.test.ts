@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { bindWindowControls } from '../../../../src/renderer/dom/windowControls';
-import { WINDOW_CONTROL_IDS } from '../../../../src/renderer/constants';
-import type { CalendarApi } from '../../../../src/shared/calendarApi';
-import { mountIndexDocument, requireById } from '../../../support/indexDocument';
+import { bindWindowControls } from '@renderer/dom/windowControls';
+import { WINDOW_CONTROL_IDS } from '@renderer/constants';
+import type { CalendarApi } from '@shared/calendarApi';
+import { mountIndexDocument, requireById } from '@tests/support/indexDocument';
 
 function createApiMock(): CalendarApi {
   return {
     getEvents: vi.fn(),
     saveEvent: vi.fn(),
+    saveOccurrence: vi.fn(),
     deleteEvent: vi.fn(),
+    deleteOccurrence: vi.fn(),
     getSettings: vi.fn(),
     updateSettings: vi.fn(),
     minimizeWindow: vi.fn(),

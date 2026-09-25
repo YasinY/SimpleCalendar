@@ -1,8 +1,9 @@
-import type { CalendarEvent } from '../../src/shared/calendarEvent';
+import type { CalendarEvent } from '@shared/calendarEvent';
 
 const DEFAULT_EVENT: CalendarEvent = {
   id: 'event-1',
   date: '2026-09-16',
+  endDate: null,
   time: '09:00',
   endTime: null,
   allDay: false,
@@ -10,6 +11,7 @@ const DEFAULT_EVENT: CalendarEvent = {
   notes: '',
   color: null,
   reminderMinutes: null,
+  recurrence: null,
   notified: false
 };
 

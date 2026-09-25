@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DRAG_SNAP_MINUTES, MINUTES_PER_DAY } from '../../../../src/renderer/constants';
-import { minutesFromPointer, snapMinutes } from '../../../../src/renderer/views/timeGridGeometry';
+import { DRAG_SNAP_MINUTES, MINUTES_PER_DAY } from '@renderer/constants';
+import { minutesFromPointer, snapMinutes } from '@renderer/views/timeGridGeometry';
 
 const COLUMN_TOP = 100;
 const COLUMN_HEIGHT = 2880;

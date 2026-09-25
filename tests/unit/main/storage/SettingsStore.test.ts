@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { SettingsStore } from '../../../../src/main/storage/SettingsStore';
-import { DEFAULT_SETTINGS } from '../../../../src/shared/settingsDefaults';
+import { SettingsStore } from '@main/storage/SettingsStore';
+import { DEFAULT_SETTINGS } from '@shared/settingsDefaults';
 
 let directory: string;
 let filePath: string;

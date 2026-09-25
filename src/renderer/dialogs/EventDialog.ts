@@ -2,23 +2,37 @@ import {
   ALL_DAY_TIME,
   DEFAULT_EVENT_TIME,
   DIALOG_LABELS,
+  NO_DATE,
   NO_END_TIME,
   NO_NOTES,
+  RECURRENCE_NONE_VALUE,
+  RECURRENCE_OPTIONS,
+  RECURRENCE_UNIT_LABELS,
   REMINDER_NONE_VALUE,
   REMINDER_OPTIONS
-} from '../constants';
-import { formatLongDate, fromIsoDate } from '../date/dateUtils';
-import { requireElement } from '../dom/elements';
-import { fillSelect } from '../dom/selectOptions';
-import { DEFAULT_EVENT_COLOR, resolveEventColor } from '../events/eventColors';
+} from '@renderer/constants';
+import { formatLongDate, fromIsoDate } from '@renderer/date/dateUtils';
+import { requireElement } from '@renderer/dom/elements';
+import { fillSelect } from '@renderer/dom/selectOptions';
+import { DEFAULT_EVENT_COLOR, resolveEventColor } from '@renderer/events/eventColors';
 import { buildColorSwatches } from './colorSwatches';
 import { DialogOverlay } from './DialogOverlay';
 import type { DiscardPrompt } from './DiscardPrompt';
-import { toEndTime, toReminderMinutes, toReminderValue } from './eventFormValues';
+import {
+  toEndTime,
+  toIntervalValue,
+  toOptionalDate,
+  toRecurrence,
+  toRecurrenceValue,
+  toReminderMinutes,
+  toReminderValue,
+  toUntilValue
+} from './eventFormValues';
 import type { EventDialogHandlers } from './eventDialogHandlers';
 import type { EventEditor } from './eventEditor';
-import type { CalendarEvent } from '../../shared/calendarEvent';
-import type { EventInput } from '../../shared/eventInput';
+import type { CalendarEvent } from '@shared/calendarEvent';
+import type { EventInput } from '@shared/eventInput';
+import type { RecurrenceFrequency } from '@shared/recurrenceFrequency';
 
 const SELECTORS = {
   FORM: '[data-dialog-form]',
@@ -27,7 +41,13 @@ const SELECTORS = {
   TITLE_INPUT: '[data-dialog-title]',
   TIME_INPUT: '[data-dialog-time]',
   END_TIME_INPUT: '[data-dialog-end-time]',
+  END_DATE_INPUT: '[data-dialog-end-date]',
   ALL_DAY_INPUT: '[data-dialog-all-day]',
+  RECURRENCE_SELECT: '[data-dialog-recurrence]',
+  RECURRENCE_DETAILS: '[data-dialog-recurrence-details]',
+  INTERVAL_INPUT: '[data-dialog-interval]',
+  INTERVAL_UNIT: '[data-dialog-interval-unit]',
+  UNTIL_INPUT: '[data-dialog-until]',
   NOTES_INPUT: '[data-dialog-notes]',
   REMINDER_SELECT: '[data-dialog-reminder]',
   COLOR_GROUP: '[data-dialog-colors]',
@@ -39,6 +59,7 @@ const SELECTORS = {
 const COLOR_INPUT_SELECTOR = 'input';
 const CHECKED_COLOR_SELECTOR = COLOR_INPUT_SELECTOR + ':checked';
 const EMPTY_TITLE = '';
+const NO_UNIT = '';
 
 export class EventDialog implements EventEditor {
   readonly #overlay: DialogOverlay;
@@ -48,7 +69,13 @@ export class EventDialog implements EventEditor {
   readonly #titleInput: HTMLInputElement;
   readonly #timeInput: HTMLInputElement;
   readonly #endTimeInput: HTMLInputElement;
+  readonly #endDateInput: HTMLInputElement;
   readonly #allDayInput: HTMLInputElement;
+  readonly #recurrenceSelect: HTMLSelectElement;
+  readonly #recurrenceDetails: HTMLElement;
+  readonly #intervalInput: HTMLInputElement;
+  readonly #intervalUnit: HTMLElement;
+  readonly #untilInput: HTMLInputElement;
   readonly #notesInput: HTMLTextAreaElement;
   readonly #reminderSelect: HTMLSelectElement;
   readonly #colorGroup: HTMLElement;
@@ -70,7 +97,13 @@ export class EventDialog implements EventEditor {
     this.#titleInput = requireElement(overlayElement, SELECTORS.TITLE_INPUT);
     this.#timeInput = requireElement(overlayElement, SELECTORS.TIME_INPUT);
     this.#endTimeInput = requireElement(overlayElement, SELECTORS.END_TIME_INPUT);
+    this.#endDateInput = requireElement(overlayElement, SELECTORS.END_DATE_INPUT);
     this.#allDayInput = requireElement(overlayElement, SELECTORS.ALL_DAY_INPUT);
+    this.#recurrenceSelect = requireElement(overlayElement, SELECTORS.RECURRENCE_SELECT);
+    this.#recurrenceDetails = requireElement(overlayElement, SELECTORS.RECURRENCE_DETAILS);
+    this.#intervalInput = requireElement(overlayElement, SELECTORS.INTERVAL_INPUT);
+    this.#intervalUnit = requireElement(overlayElement, SELECTORS.INTERVAL_UNIT);
+    this.#untilInput = requireElement(overlayElement, SELECTORS.UNTIL_INPUT);
     this.#notesInput = requireElement(overlayElement, SELECTORS.NOTES_INPUT);
     this.#reminderSelect = requireElement(overlayElement, SELECTORS.REMINDER_SELECT);
     this.#colorGroup = requireElement(overlayElement, SELECTORS.COLOR_GROUP);
@@ -78,6 +111,7 @@ export class EventDialog implements EventEditor {
     this.#deleteButton = requireElement(overlayElement, SELECTORS.DELETE_BUTTON);
     this.#handlers = handlers;
     fillSelect(this.#reminderSelect, REMINDER_OPTIONS);
+    fillSelect(this.#recurrenceSelect, RECURRENCE_OPTIONS);
     buildColorSwatches(this.#colorGroup);
     this.#bindInteractions();
   }
@@ -91,11 +125,16 @@ export class EventDialog implements EventEditor {
     this.#titleInput.value = EMPTY_TITLE;
     this.#timeInput.value = time;
     this.#endTimeInput.value = NO_END_TIME;
+    this.#endDateInput.value = NO_DATE;
     this.#allDayInput.checked = false;
+    this.#recurrenceSelect.value = RECURRENCE_NONE_VALUE;
+    this.#intervalInput.value = toIntervalValue(null);
+    this.#untilInput.value = NO_DATE;
     this.#notesInput.value = NO_NOTES;
     this.#reminderSelect.value = REMINDER_NONE_VALUE;
     this.#selectColor(DEFAULT_EVENT_COLOR);
     this.#applyAllDayState();
+    this.#applyRecurrenceState();
     this.#show(isoDate);
   }
 
@@ -108,11 +147,16 @@ export class EventDialog implements EventEditor {
     this.#titleInput.value = event.title;
     this.#timeInput.value = event.time;
     this.#endTimeInput.value = event.endTime ?? NO_END_TIME;
+    this.#endDateInput.value = event.endDate ?? NO_DATE;
     this.#allDayInput.checked = event.allDay;
+    this.#recurrenceSelect.value = toRecurrenceValue(event.recurrence);
+    this.#intervalInput.value = toIntervalValue(event.recurrence);
+    this.#untilInput.value = toUntilValue(event.recurrence);
     this.#notesInput.value = event.notes;
     this.#reminderSelect.value = toReminderValue(event.reminderMinutes);
     this.#selectColor(resolveEventColor(event.color));
     this.#applyAllDayState();
+    this.#applyRecurrenceState();
     this.#show(event.date);
   }
 
@@ -138,8 +182,17 @@ export class EventDialog implements EventEditor {
     this.#endTimeInput.disabled = allDay;
   }
 
+  #applyRecurrenceState(): void {
+    const frequency = this.#recurrenceSelect.value;
+    const repeats = frequency !== RECURRENCE_NONE_VALUE;
+    this.#recurrenceDetails.hidden = !repeats;
+    this.#intervalUnit.textContent = repeats ? RECURRENCE_UNIT_LABELS[frequency as RecurrenceFrequency] : NO_UNIT;
+  }
+
   #show(isoDate: string): void {
     this.#dateLabel.textContent = formatLongDate(fromIsoDate(isoDate));
+    this.#endDateInput.min = isoDate;
+    this.#untilInput.min = isoDate;
     this.#overlay.show();
     this.#titleInput.focus();
     this.#titleInput.select();
@@ -148,29 +201,33 @@ export class EventDialog implements EventEditor {
   #bindInteractions(): void {
     this.#form.addEventListener('submit', (domEvent) => {
       domEvent.preventDefault();
-      this.#handlers.onSubmit(this.#collectPayload());
+      this.#handlers.onSubmit(this.#collectPayload(), this.#activeEvent);
     });
 
     this.#deleteButton.addEventListener('click', () => {
       if (!this.#activeEvent) return;
-      this.#handlers.onDelete(this.#activeEvent.id);
+      this.#handlers.onDelete(this.#activeEvent);
     });
 
     this.#allDayInput.addEventListener('change', () => this.#applyAllDayState());
+    this.#recurrenceSelect.addEventListener('change', () => this.#applyRecurrenceState());
   }
 
   #collectPayload(): EventInput {
     const allDay = this.#allDayInput.checked;
     return {
       id: this.#activeEvent?.id ?? null,
+      occurrenceDate: this.#activeEvent?.date ?? null,
       date: this.#activeDate ?? EMPTY_TITLE,
+      endDate: toOptionalDate(this.#endDateInput.value),
       time: allDay ? ALL_DAY_TIME : this.#timeInput.value,
       endTime: allDay ? null : toEndTime(this.#endTimeInput.value),
       allDay,
       color: this.#selectedColor(),
       title: this.#titleInput.value.trim(),
       notes: this.#notesInput.value.trim(),
-      reminderMinutes: toReminderMinutes(this.#reminderSelect.value)
+      reminderMinutes: toReminderMinutes(this.#reminderSelect.value),
+      recurrence: toRecurrence(this.#recurrenceSelect.value, this.#intervalInput.value, this.#untilInput.value)
     };
   }
 }

@@ -1,4 +1,5 @@
 export interface DragPayload {
-  eventId: string;
-  offsetMinutes: number;
+  eventKey: string;
+  dayOffset: number;
+  offsetMinutes: number | null;
 }

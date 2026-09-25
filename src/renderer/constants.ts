@@ -1,6 +1,8 @@
 import type { SelectOption } from './selectOption';
-import type { Theme } from '../shared/theme';
-import type { ViewMode } from '../shared/viewMode';
+import type { RecurrenceFrequency } from '@shared/recurrenceFrequency';
+import type { SeriesScope } from '@shared/seriesScope';
+import type { Theme } from '@shared/theme';
+import type { ViewMode } from '@shared/viewMode';
 
 export const DAYS_PER_WEEK = 7;
 export const FIRST_MONTH_DAY = 1;
@@ -75,6 +77,35 @@ export const DIALOG_LABELS = {
   EDIT_SUBMIT: 'Sichern'
 } as const;
 
+export const NO_DATE = '';
+export const NO_DAY_OFFSET = 0;
+export const EVENT_KEY_SEPARATOR = '@';
+export const SEGMENT_LABELS = {
+  FROM: 'ab ',
+  UNTIL: 'bis '
+} as const;
+
+export const RECURRENCE_NONE_VALUE = '';
+export const DEFAULT_RECURRENCE_INTERVAL = 1;
+export const RECURRENCE_OPTIONS: SelectOption[] = [
+  { value: RECURRENCE_NONE_VALUE, label: 'Nie' },
+  { value: 'daily', label: 'Täglich' },
+  { value: 'weekly', label: 'Wöchentlich' },
+  { value: 'monthly', label: 'Monatlich' },
+  { value: 'yearly', label: 'Jährlich' }
+];
+export const RECURRENCE_UNIT_LABELS: Record<RecurrenceFrequency, string> = {
+  daily: 'Tage',
+  weekly: 'Wochen',
+  monthly: 'Monate',
+  yearly: 'Jahre'
+};
+
+export const SERIES_SCOPES = {
+  OCCURRENCE: 'occurrence',
+  SERIES: 'series'
+} as const satisfies Record<string, SeriesScope>;
+
 export const CSS_CLASSES = {
   MONTH_VIEW: 'month-view',
   WEEKDAYS: 'weekdays',
@@ -90,12 +121,18 @@ export const CSS_CLASSES = {
   DAY_EVENTS: 'day__events',
   EVENT: 'event',
   EVENT_BLOCK: 'event--block',
+  EVENT_CONTINUES_BEFORE: 'event--continues-before',
+  EVENT_CONTINUES_AFTER: 'event--continues-after',
+  EVENT_RECURRING: 'event--recurring',
   EVENT_TIME: 'event__time',
   EVENT_TITLE: 'event__title',
   DROP_TARGET: 'drop-target',
   TIME_GRID: 'time-grid',
   TIME_GRID_HEADER: 'time-grid__header',
   TIME_GRID_CORNER: 'time-grid__corner',
+  TIME_GRID_ALL_DAY: 'time-grid__all-day',
+  TIME_GRID_ALL_DAY_CELL: 'time-grid__all-day-cell',
+  TIME_GRID_ALL_DAY_CELL_TODAY: 'time-grid__all-day-cell--today',
   TIME_GRID_DAY: 'time-grid__day',
   TIME_GRID_DAY_TODAY: 'time-grid__day--today',
   TIME_GRID_DAY_HOLIDAY: 'time-grid__day--holiday',
@@ -127,7 +164,7 @@ export const CSS_VARIABLES = {
 
 export const DATASET_KEYS = {
   DATE: 'date',
-  EVENT_ID: 'eventId',
+  EVENT_KEY: 'eventKey',
   VIEW_MODE: 'viewMode'
 } as const;
 

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { SettingsDialog } from '../../../../src/renderer/dialogs/SettingsDialog';
-import { DiscardPrompt } from '../../../../src/renderer/dialogs/DiscardPrompt';
-import type { SettingsPatch } from '../../../../src/renderer/dialogs/settingsPatch';
-import { HIDDEN_ATTRIBUTE, THEME_OPTIONS, THEMES, VIEW_MODES } from '../../../../src/renderer/constants';
-import { REGION_OPTIONS } from '../../../../src/renderer/holidays/holidayConstants';
-import type { SelectOption } from '../../../../src/renderer/selectOption';
-import type { Settings } from '../../../../src/shared/settings';
-import { mountIndexDocument, requireById } from '../../../support/indexDocument';
+import { SettingsDialog } from '@renderer/dialogs/SettingsDialog';
+import { DiscardPrompt } from '@renderer/dialogs/DiscardPrompt';
+import type { SettingsPatch } from '@renderer/dialogs/settingsPatch';
+import { HIDDEN_ATTRIBUTE, THEME_OPTIONS, THEMES, VIEW_MODES } from '@renderer/constants';
+import { REGION_OPTIONS } from '@renderer/holidays/holidayConstants';
+import type { SelectOption } from '@renderer/selectOption';
+import type { Settings } from '@shared/settings';
+import { mountIndexDocument, requireById } from '@tests/support/indexDocument';
 
 const OVERLAY_ID = 'settingsOverlay';
 const DISCARD_OVERLAY_ID = 'discardOverlay';
@@ -19,6 +19,7 @@ const SELECTORS = {
   REGION_SELECT: '[data-settings-region]',
   THEME_SELECT: '[data-settings-theme]',
   CITY_INPUT: '[data-settings-city]',
+  AUTO_UPDATE_INPUT: '[data-settings-auto-update]',
   CANCEL_BUTTON: '[data-settings-cancel]'
 } as const;
 
@@ -27,7 +28,8 @@ const SETTINGS: Settings = {
   theme: THEMES.DARK,
   weatherCity: CITY,
   weatherLocation: null,
-  viewMode: VIEW_MODES.MONTH
+  viewMode: VIEW_MODES.MONTH,
+  autoUpdate: false
 };
 
 interface DialogFixture {
@@ -37,6 +39,7 @@ interface DialogFixture {
   regionSelect: HTMLSelectElement;
   themeSelect: HTMLSelectElement;
   cityInput: HTMLInputElement;
+  autoUpdateInput: HTMLInputElement;
   onSave: Mock<(patch: SettingsPatch) => void>;
 }
 
@@ -55,6 +58,7 @@ function createFixture(): DialogFixture {
     regionSelect: query(overlay, SELECTORS.REGION_SELECT),
     themeSelect: query(overlay, SELECTORS.THEME_SELECT),
     cityInput: query(overlay, SELECTORS.CITY_INPUT),
+    autoUpdateInput: query(overlay, SELECTORS.AUTO_UPDATE_INPUT),
     onSave
   };
 }
@@ -80,7 +84,8 @@ describe('SettingsDialog', () => {
   });
 
   it('opens with the fields filled from the settings and focuses the city', () => {
-    const { dialog, overlay, regionSelect, themeSelect, cityInput } = createFixture();
+    const { dialog, overlay, regionSelect, themeSelect, cityInput, autoUpdateInput } = createFixture();
+    autoUpdateInput.checked = true;
 
     dialog.open(SETTINGS);
 
@@ -88,19 +93,21 @@ describe('SettingsDialog', () => {
     expect(regionSelect.value).toBe(REGION);
     expect(themeSelect.value).toBe(THEMES.DARK);
     expect(cityInput.value).toBe(CITY);
+    expect(autoUpdateInput.checked).toBe(false);
     expect(document.activeElement).toBe(cityInput);
   });
 
   it('saves the selected values with a trimmed city on submit', () => {
-    const { dialog, form, cityInput, onSave } = createFixture();
+    const { dialog, form, cityInput, autoUpdateInput, onSave } = createFixture();
     dialog.open(SETTINGS);
     cityInput.value = PADDED_CITY;
+    autoUpdateInput.checked = true;
 
     const submitEvent = new Event('submit', { cancelable: true });
     form.dispatchEvent(submitEvent);
 
     expect(submitEvent.defaultPrevented).toBe(true);
-    expect(onSave).toHaveBeenCalledExactlyOnceWith({ holidayRegion: REGION, theme: THEMES.DARK, weatherCity: CITY });
+    expect(onSave).toHaveBeenCalledExactlyOnceWith({ holidayRegion: REGION, theme: THEMES.DARK, weatherCity: CITY, autoUpdate: true });
   });
 
   it('hides the overlay on close', () => {

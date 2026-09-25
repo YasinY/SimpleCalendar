@@ -8,4 +8,5 @@ export interface Settings {
   weatherCity: string;
   weatherLocation: WeatherLocation | null;
   viewMode: ViewMode;
+  autoUpdate: boolean;
 }

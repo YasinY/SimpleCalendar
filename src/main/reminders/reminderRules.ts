@@ -1,5 +1,5 @@
-import { MILLISECONDS_PER_MINUTE } from '../constants';
-import type { CalendarEvent } from '../../shared/calendarEvent';
+import { MILLISECONDS_PER_MINUTE } from '@main/constants';
+import type { CalendarEvent } from '@shared/calendarEvent';
 
 const DATE_PART_SEPARATOR = '-';
 const TIME_PART_SEPARATOR = ':';
@@ -21,4 +21,22 @@ export function isDue(event: CalendarEvent, now: Date): boolean {
   if (event.reminderMinutes === null) return false;
   const triggerTime = toEventDate(event).getTime() - event.reminderMinutes * MILLISECONDS_PER_MINUTE;
   return now.getTime() >= triggerTime;
+}
+
+export function groupBySeries(events: CalendarEvent[]): Map<string, CalendarEvent[]> {
+  const grouped = new Map<string, CalendarEvent[]>();
+  for (const event of events) {
+    const occurrences = grouped.get(event.id) ?? [];
+    occurrences.push(event);
+    grouped.set(event.id, occurrences);
+  }
+  return grouped;
+}
+
+export function findLatestDue(occurrences: CalendarEvent[], now: Date): CalendarEvent | undefined {
+  let latest: CalendarEvent | undefined;
+  for (const occurrence of occurrences) {
+    if (isDue(occurrence, now)) latest = occurrence;
+  }
+  return latest;
 }

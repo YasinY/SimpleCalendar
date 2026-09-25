@@ -4,8 +4,10 @@ import {
   SELECTORS,
   TODAY_ISO,
   VIEW_BUTTONS,
+  allDayCell,
   collectPageErrors,
   dayCell,
+  expectContinuation,
   freezeClock,
   pointAtMinutes,
   readStyleVariable,
@@ -51,6 +53,7 @@ const PATTERNS = {
   HOLIDAY_DAY: /day--holiday/,
   HOLIDAY_COLUMN: /time-grid__column--holiday/,
   TODAY_COLUMN: /time-grid__column--today/,
+  TODAY_ALL_DAY_CELL: /time-grid__all-day-cell--today/,
   DURATION_TWO: /event--duration-2/,
   DURATION_FOUR: /event--duration-4/,
   ANY_DURATION: /event--duration-/,
@@ -66,7 +69,7 @@ const STYLE_VARIABLES = {
 } as const;
 
 const ATTRIBUTES = {
-  EVENT_ID: 'data-event-id',
+  EVENT_KEY: 'data-event-key',
   DATE: 'data-date',
   VIEW_MODE: 'data-view-mode'
 } as const;
@@ -104,10 +107,21 @@ const TIMES = {
   SNAPPED_SLOT: '14:00',
   FIRST_SLOT: '00:00',
   LAST_SLOT: '23:45',
-  ALL_DAY: 'Ganztägig'
+  ALL_DAY: 'Ganztägig',
+  FROM_MORNING: 'ab 10:00',
+  UNTIL_NOON: 'bis 12:00',
+  FROM_NIGHT: 'ab 22:00'
 } as const;
 
-const UNKNOWN_EVENT_ID = 'unknown-event';
+const DATES = {
+  MONDAY: '2026-09-14',
+  TUESDAY: '2026-09-15',
+  THURSDAY: '2026-09-17',
+  FRIDAY: '2026-09-18',
+  SATURDAY: '2026-09-19'
+} as const;
+
+const UNKNOWN_EVENT_KEY = 'unknown-event@' + TODAY_ISO;
 const UNKNOWN_VIEW_MODE = 'year';
 const NEW_EVENT_TITLE = 'Doppelklick Termin';
 const DISCARD_KEEP_SELECTOR = '[data-discard-keep]';
@@ -135,6 +149,14 @@ const OVERLAPPING_EVENTS = [
   { date: TODAY_ISO, time: '10:00', endTime: '10:30', title: 'Anschluss' },
   { date: TODAY_ISO, time: '12:00', title: 'Mittag' },
   { date: TODAY_ISO, time: '00:00', allDay: true, title: 'Ganztags' }
+];
+
+const MULTI_DAY_EVENTS = [
+  { date: TODAY_ISO, time: '00:00', allDay: true, title: 'Frei' },
+  { date: DATES.TUESDAY, endDate: DATES.THURSDAY, time: '00:00', allDay: true, title: 'Urlaub' },
+  { date: DATES.TUESDAY, endDate: DATES.THURSDAY, time: '10:00', endTime: '12:00', title: 'Messe' },
+  { date: DATES.FRIDAY, endDate: DATES.SATURDAY, time: '22:00', title: 'Nachtschicht' },
+  { date: TODAY_ISO, time: '08:00', title: 'Früh' }
 ];
 
 const SINGLE_EVENT = [{ date: TODAY_ISO, time: '09:00', endTime: '10:00', title: 'Termin' }];
@@ -190,6 +212,19 @@ test.describe('month view', () => {
     await expect(eventByTitle(today, 'Frei').locator(SELECTORS.EVENT_TIME)).toHaveText(TIMES.ALL_DAY);
     await expect(eventByTitle(today, 'Kurz').locator(SELECTORS.EVENT_TIME)).toHaveText('14:00–15:00');
     await expect(eventByTitle(today, 'Offen').locator(SELECTORS.EVENT_TIME)).toHaveText('16:00');
+  });
+
+  test('sorts multi day and all day pills first and marks continuing days', async ({ calendar: { page } }) => {
+    await seedEvents(page, MULTI_DAY_EVENTS);
+    await freezeClock(page);
+    const today = dayCell(page, TODAY_ISO);
+    await expect(today.locator(SELECTORS.EVENT_TITLE)).toHaveText(['Urlaub', 'Messe', 'Frei', 'Früh']);
+    await expectContinuation(eventByTitle(today, 'Messe'), true, true);
+    await expect(eventByTitle(today, 'Messe')).not.toHaveClass(PATTERNS.ANY_DURATION);
+    await expectContinuation(eventByTitle(today, 'Frei'), false, false);
+    await expect(eventByTitle(dayCell(page, DATES.TUESDAY), 'Messe').locator(SELECTORS.EVENT_TIME)).toHaveText(TIMES.FROM_MORNING);
+    await expect(eventByTitle(dayCell(page, DATES.THURSDAY), 'Messe').locator(SELECTORS.EVENT_TIME)).toHaveText(TIMES.UNTIL_NOON);
+    await expect(dayCell(page, DATES.MONDAY).locator(SELECTORS.EVENT)).toHaveCount(0);
   });
 
   test('shows notes in the tooltip and falls back to the default color', async ({ calendar: { page } }) => {
@@ -278,8 +313,7 @@ test.describe('week view', () => {
       { title: 'Lang', start: '540', minutes: '120', column: '0', columns: '2' },
       { title: 'Kurz', start: '540', minutes: '60', column: '1', columns: '2' },
       { title: 'Anschluss', start: '600', minutes: '30', column: '1', columns: '2' },
-      { title: 'Mittag', start: '720', minutes: '60', column: '0', columns: '1' },
-      { title: 'Ganztags', start: '0', minutes: '60', column: '0', columns: '1' }
+      { title: 'Mittag', start: '720', minutes: '60', column: '0', columns: '1' }
     ];
     for (const expected of expectedLayout) {
       const block = eventByTitle(column, expected.title);
@@ -289,7 +323,8 @@ test.describe('week view', () => {
       expect(await readStyleVariable(block, STYLE_VARIABLES.COLUMN)).toBe(expected.column);
       expect(await readStyleVariable(block, STYLE_VARIABLES.COLUMNS)).toBe(expected.columns);
     }
-    await expect(eventByTitle(column, 'Ganztags').locator(SELECTORS.EVENT_TIME)).toHaveText(TIMES.ALL_DAY);
+    await expect(eventByTitle(column, 'Ganztags')).toHaveCount(0);
+    await expect(eventByTitle(allDayCell(page, TODAY_ISO), 'Ganztags').locator(SELECTORS.EVENT_TIME)).toHaveText(TIMES.ALL_DAY);
   });
 
   test('opens the edit dialog for a clicked block and ignores clicks on empty slots', async ({ calendar: { page } }) => {
@@ -305,6 +340,41 @@ test.describe('week view', () => {
     await column.locator(SELECTORS.EVENT).click();
     await expect(page.locator(SELECTORS.DIALOG_HEADING)).toHaveText(TITLES.EDIT_DIALOG);
     await expect(page.locator(SELECTORS.DIALOG_TITLE)).toHaveValue('Termin');
+  });
+
+  test('shows all day events in the all day row and splits timed multi day events into blocks', async ({ calendar: { page } }) => {
+    await seedEvents(page, MULTI_DAY_EVENTS);
+    await freezeClock(page);
+    await showView(page, VIEW_BUTTONS.WEEK);
+
+    await expect(allDayCell(page, TODAY_ISO)).toHaveClass(PATTERNS.TODAY_ALL_DAY_CELL);
+    await expect(allDayCell(page, DATES.MONDAY)).not.toHaveClass(PATTERNS.TODAY_ALL_DAY_CELL);
+    await expect(allDayCell(page, TODAY_ISO).locator(SELECTORS.EVENT_TITLE)).toHaveText(['Urlaub', 'Frei']);
+    await expect(timeGridColumn(page, TODAY_ISO).locator(SELECTORS.EVENT_TITLE)).toHaveText(['Messe', 'Früh']);
+
+    const vacationSegments = [
+      { date: DATES.TUESDAY, continuesBefore: false, continuesAfter: true },
+      { date: TODAY_ISO, continuesBefore: true, continuesAfter: true },
+      { date: DATES.THURSDAY, continuesBefore: true, continuesAfter: false }
+    ];
+    for (const { date, continuesBefore, continuesAfter } of vacationSegments) {
+      await expectContinuation(eventByTitle(allDayCell(page, date), 'Urlaub'), continuesBefore, continuesAfter);
+      await expect(eventByTitle(allDayCell(page, date), 'Urlaub').locator(SELECTORS.EVENT_TIME)).toHaveText(TIMES.ALL_DAY);
+    }
+
+    const expectedBlocks = [
+      { title: 'Messe', date: DATES.TUESDAY, start: '600', minutes: '840', label: TIMES.FROM_MORNING },
+      { title: 'Messe', date: TODAY_ISO, start: '0', minutes: '1440', label: TIMES.ALL_DAY },
+      { title: 'Messe', date: DATES.THURSDAY, start: '0', minutes: '720', label: TIMES.UNTIL_NOON },
+      { title: 'Nachtschicht', date: DATES.FRIDAY, start: '1320', minutes: '120', label: TIMES.FROM_NIGHT },
+      { title: 'Nachtschicht', date: DATES.SATURDAY, start: '0', minutes: '1440', label: TIMES.ALL_DAY }
+    ];
+    for (const expected of expectedBlocks) {
+      const block = eventByTitle(timeGridColumn(page, expected.date), expected.title);
+      await expect(block.locator(SELECTORS.EVENT_TIME)).toHaveText(expected.label);
+      expect(await readStyleVariable(block, STYLE_VARIABLES.START)).toBe(expected.start);
+      expect(await readStyleVariable(block, STYLE_VARIABLES.MINUTES)).toBe(expected.minutes);
+    }
   });
 });
 
@@ -360,25 +430,25 @@ test.describe('day view', () => {
 });
 
 test.describe('edge cases', () => {
-  test('ignores pills without a known event id in the month view', async ({ calendar: { page } }) => {
+  test('ignores pills without a known event key in the month view', async ({ calendar: { page } }) => {
     await seedEvents(page, SINGLE_EVENT);
     await freezeClock(page);
     const pill = dayCell(page, TODAY_ISO).locator(SELECTORS.EVENT);
-    await setAttribute(pill, ATTRIBUTES.EVENT_ID, UNKNOWN_EVENT_ID);
+    await setAttribute(pill, ATTRIBUTES.EVENT_KEY, UNKNOWN_EVENT_KEY);
     await pill.click();
-    await removeAttribute(pill, ATTRIBUTES.EVENT_ID);
+    await removeAttribute(pill, ATTRIBUTES.EVENT_KEY);
     await pill.click();
     await expect(page.locator(SELECTORS.DIALOG_OVERLAY)).toBeHidden();
   });
 
-  test('ignores blocks without a known event id in the time grid', async ({ calendar: { page } }) => {
+  test('ignores blocks without a known event key in the time grid', async ({ calendar: { page } }) => {
     await seedEvents(page, SINGLE_EVENT);
     await freezeClock(page);
     await showView(page, VIEW_BUTTONS.DAY);
     const block = timeGridColumn(page, TODAY_ISO).locator(SELECTORS.EVENT);
-    await setAttribute(block, ATTRIBUTES.EVENT_ID, UNKNOWN_EVENT_ID);
+    await setAttribute(block, ATTRIBUTES.EVENT_KEY, UNKNOWN_EVENT_KEY);
     await block.click();
-    await removeAttribute(block, ATTRIBUTES.EVENT_ID);
+    await removeAttribute(block, ATTRIBUTES.EVENT_KEY);
     await block.click();
     await expect(page.locator(SELECTORS.DIALOG_OVERLAY)).toBeHidden();
   });

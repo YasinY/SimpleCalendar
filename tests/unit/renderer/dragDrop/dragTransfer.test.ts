@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DROP_EFFECT_MOVE } from '../../../../src/renderer/constants';
-import { DRAG_EVENTS, allowDrop, makeDraggable, readDragPayload, startDrag } from '../../../../src/renderer/dragDrop/dragTransfer';
-import { createDragEvent, createRawTransfer, readTransferPayload } from '../../../support/dragEvents';
+import { DROP_EFFECT_MOVE } from '@renderer/constants';
+import { DRAG_EVENTS, allowDrop, makeDraggable, readDragPayload, startDrag } from '@renderer/dragDrop/dragTransfer';
+import { createDragEvent, createRawTransfer, readTransferPayload } from '@tests/support/dragEvents';
 
-const PAYLOAD = { eventId: 'event-1', offsetMinutes: 30 };
+const PAYLOAD = { eventKey: 'event-1@2026-09-16', dayOffset: 1, offsetMinutes: 30 };
 const INVALID_JSON = '{not json';
 
 describe('dragTransfer', () => {

@@ -8,16 +8,17 @@ import {
   INITIAL_SCROLL_HOUR,
   MINUTES_PER_DAY,
   WEEKDAY_LABELS
-} from '../../../../src/renderer/constants';
-import { DRAG_EVENTS } from '../../../../src/renderer/dragDrop/dragTransfer';
-import { TimeGridView } from '../../../../src/renderer/views/TimeGridView';
-import { createCalendarEvent } from '../../../support/calendarEventFactory';
-import { createDragEvent, createPayloadTransfer, readTransferPayload } from '../../../support/dragEvents';
-import type { DayColumn } from '../../../../src/renderer/date/dayColumn';
-import type { DayColumnLayout } from '../../../../src/renderer/date/dayColumnLayout';
-import type { HolidayMap } from '../../../../src/renderer/holidays/holidayDates';
-import type { EventsByDate } from '../../../../src/renderer/views/eventsByDate';
-import type { TimeGridHandlers } from '../../../../src/renderer/views/timeGridHandlers';
+} from '@renderer/constants';
+import { DRAG_EVENTS } from '@renderer/dragDrop/dragTransfer';
+import { groupSegmentsByDate } from '@renderer/events/eventGrouping';
+import { toEventKey } from '@renderer/events/eventKey';
+import { TimeGridView } from '@renderer/views/TimeGridView';
+import { createCalendarEvent } from '@tests/support/calendarEventFactory';
+import { createDragEvent, createPayloadTransfer, readTransferPayload } from '@tests/support/dragEvents';
+import type { DayColumn } from '@renderer/date/dayColumn';
+import type { DayColumnLayout } from '@renderer/date/dayColumnLayout';
+import type { HolidayMap } from '@renderer/holidays/holidayDates';
+import type { TimeGridHandlers } from '@renderer/views/timeGridHandlers';
 
 const TODAY_ISO = '2026-09-01';
 const HOLIDAY_ISO = '2026-09-02';
@@ -33,6 +34,7 @@ const FIRST_LABELED_HOUR = 1;
 const FIRST_HOUR_LABEL = '01:00';
 const FIRST_BLOCK_VARIABLES = ['540', '120', '0', '2'];
 const SECOND_BLOCK_VARIABLES = ['600', '30', '1', '2'];
+const NIGHT_LAST_BLOCK_VARIABLES = ['0', '120', '0', '1'];
 
 const NOW_HOUR = 10;
 const NOW_MINUTE = 30;
@@ -49,9 +51,18 @@ const DROPPED_START_MINUTES = 570;
 const SLOT_POINTER_Y = 607;
 const SLOT_TIME = '10:00';
 const SCROLL_HEIGHT = 1440;
+const NO_DAY_OFFSET = 0;
+const SECOND_DAY_OFFSET = 1;
+const KEEP_TIME = null;
 
 const FIRST_EVENT = createCalendarEvent({ id: 'first', date: TODAY_ISO, time: '09:00', endTime: '11:00' });
 const SECOND_EVENT = createCalendarEvent({ id: 'second', date: TODAY_ISO, time: '10:00', endTime: '10:30' });
+const NIGHT_EVENT = createCalendarEvent({ id: 'night', date: TODAY_ISO, endDate: HOLIDAY_ISO, time: '20:00', endTime: '02:00' });
+const ALL_DAY_EVENT = createCalendarEvent({ id: 'holiday', date: HOLIDAY_ISO, allDay: true });
+const FIRST_KEY = toEventKey(FIRST_EVENT);
+const SECOND_KEY = toEventKey(SECOND_EVENT);
+const NIGHT_KEY = toEventKey(NIGHT_EVENT);
+const ALL_DAY_KEY = toEventKey(ALL_DAY_EVENT);
 
 const TODAY_COLUMN: DayColumn = { iso: TODAY_ISO, dayNumber: TODAY_DAY_NUMBER, weekdayIndex: TUESDAY_INDEX, isToday: true };
 const HOLIDAY_COLUMN: DayColumn = { iso: HOLIDAY_ISO, dayNumber: HOLIDAY_DAY_NUMBER, weekdayIndex: WEDNESDAY_INDEX, isToday: false };
@@ -61,6 +72,10 @@ const EVENT_SELECTOR = '.' + CSS_CLASSES.EVENT;
 const COLUMN_SELECTOR = '.' + CSS_CLASSES.TIME_GRID_COLUMN;
 const DAY_HEADER_SELECTOR = '.' + CSS_CLASSES.TIME_GRID_DAY;
 const NOW_LINE_SELECTOR = '.' + CSS_CLASSES.NOW_LINE;
+const HEADER_SELECTOR = '.' + CSS_CLASSES.TIME_GRID_HEADER;
+const ALL_DAY_SELECTOR = '.' + CSS_CLASSES.TIME_GRID_ALL_DAY;
+const ALL_DAY_CELL_SELECTOR = '.' + CSS_CLASSES.TIME_GRID_ALL_DAY_CELL;
+const CORNER_SELECTOR = '.' + CSS_CLASSES.TIME_GRID_CORNER;
 
 function createLayout(columns: DayColumn[]): DayColumnLayout {
   return { columns, years: [YEAR] };
@@ -78,11 +93,28 @@ function dispatchMouse(target: Element, type: string, clientY = COLUMN_TOP): voi
   target.dispatchEvent(new MouseEvent(type, { bubbles: true, clientY }));
 }
 
+function dropOn(zone: HTMLElement, eventKey: string, dayOffset: number, offsetMinutes: number | null): void {
+  const payload = { eventKey, dayOffset, offsetMinutes };
+  zone.dispatchEvent(createDragEvent(DRAG_EVENTS.DROP, { dataTransfer: createPayloadTransfer(payload), clientY: DROP_POINTER_Y }));
+}
+
+function startDragOf(element: HTMLElement): DataTransfer {
+  const dataTransfer = new DataTransfer();
+  element.dispatchEvent(createDragEvent(DRAG_EVENTS.START, { dataTransfer, clientY: POINTER_Y }));
+  return dataTransfer;
+}
+
+function readBlockVariables(block: HTMLElement): string[] {
+  return [CSS_VARIABLES.BLOCK_START, CSS_VARIABLES.BLOCK_MINUTES, CSS_VARIABLES.BLOCK_COLUMN, CSS_VARIABLES.BLOCK_COLUMNS].map(
+    (variable) => block.style.getPropertyValue(variable)
+  );
+}
+
 describe('TimeGridView', () => {
   let handlers: TimeGridHandlers;
   let view: TimeGridView;
   let animationFrame: ReturnType<typeof vi.fn<(callback: FrameRequestCallback) => number>>;
-  const eventsByDate: EventsByDate = new Map([[TODAY_ISO, [SECOND_EVENT, FIRST_EVENT]]]);
+  const segmentsByDate = groupSegmentsByDate([SECOND_EVENT, FIRST_EVENT, NIGHT_EVENT, ALL_DAY_EVENT]);
   const holidaysByDate: HolidayMap = new Map([[HOLIDAY_ISO, HOLIDAY_NAMES]]);
 
   beforeEach(() => {
@@ -102,16 +134,16 @@ describe('TimeGridView', () => {
   });
 
   function renderDefault(): void {
-    view.render(createLayout(DEFAULT_COLUMNS), eventsByDate, holidaysByDate);
+    view.render(createLayout(DEFAULT_COLUMNS), segmentsByDate, holidaysByDate);
   }
 
   function queryAll(selector: string): HTMLElement[] {
     return [...view.element.querySelectorAll<HTMLElement>(selector)];
   }
 
-  function requireBlock(eventId: string): HTMLButtonElement {
-    const block = view.element.querySelector<HTMLButtonElement>(`${EVENT_SELECTOR}[data-event-id="${eventId}"]`);
-    if (!block) throw new Error(eventId);
+  function requireBlock(eventKey: string, container: ParentNode = view.element): HTMLButtonElement {
+    const block = container.querySelector<HTMLButtonElement>(`${EVENT_SELECTOR}[data-event-key="${eventKey}"]`);
+    if (!block) throw new Error(eventKey);
     return block;
   }
 
@@ -133,7 +165,7 @@ describe('TimeGridView', () => {
   it('sets the day count and renders a corner plus one header per column', () => {
     renderDefault();
     expect(view.element.style.getPropertyValue(CSS_VARIABLES.DAY_COUNT)).toBe(String(DEFAULT_COLUMNS.length));
-    expect(queryAll('.' + CSS_CLASSES.TIME_GRID_CORNER)).toHaveLength(1);
+    expect(queryAll(HEADER_SELECTOR + ' ' + CORNER_SELECTOR)).toHaveLength(1);
     const [todayHeader, holidayHeader] = queryAll(DAY_HEADER_SELECTOR);
     expect(todayHeader.querySelector('.' + CSS_CLASSES.TIME_GRID_DAY_NAME)?.textContent).toBe(WEEKDAY_LABELS[TUESDAY_INDEX]);
     expect(todayHeader.querySelector('.' + CSS_CLASSES.TIME_GRID_DAY_NUMBER)?.textContent).toBe(String(TODAY_DAY_NUMBER));
@@ -155,6 +187,24 @@ describe('TimeGridView', () => {
     expect(nameElement?.title).toBe(holidayLabel);
   });
 
+  it('renders an all day row with a corner plus one dated cell per column', () => {
+    renderDefault();
+    const cells = queryAll(ALL_DAY_CELL_SELECTOR);
+    const [todayCell, holidayCell] = cells;
+    expect(queryAll(ALL_DAY_SELECTOR + ' ' + CORNER_SELECTOR)).toHaveLength(1);
+    expect(cells.map((cell) => cell.dataset.date)).toEqual([TODAY_ISO, HOLIDAY_ISO]);
+    expect(todayCell.classList.contains(CSS_CLASSES.TIME_GRID_ALL_DAY_CELL_TODAY)).toBe(true);
+    expect(holidayCell.classList.contains(CSS_CLASSES.TIME_GRID_ALL_DAY_CELL_TODAY)).toBe(false);
+  });
+
+  it('renders all day events only in the all day row', () => {
+    renderDefault();
+    const pill = requireBlock(ALL_DAY_KEY, queryAll(ALL_DAY_CELL_SELECTOR)[1]);
+    expect(pill.classList.contains(CSS_CLASSES.EVENT_BLOCK)).toBe(false);
+    expect(queryAll(`${COLUMN_SELECTOR} [data-event-key="${ALL_DAY_KEY}"]`)).toHaveLength(0);
+    expect(queryAll(`${ALL_DAY_CELL_SELECTOR} [data-event-key="${FIRST_KEY}"]`)).toHaveLength(0);
+  });
+
   it('marks today and holiday columns', () => {
     renderDefault();
     const [todayColumn, holidayColumn] = queryAll(COLUMN_SELECTOR);
@@ -167,17 +217,17 @@ describe('TimeGridView', () => {
 
   it('positions event blocks with the variables of the day layout', () => {
     renderDefault();
-    const readVariables = (block: HTMLElement) => [
-      CSS_VARIABLES.BLOCK_START,
-      CSS_VARIABLES.BLOCK_MINUTES,
-      CSS_VARIABLES.BLOCK_COLUMN,
-      CSS_VARIABLES.BLOCK_COLUMNS
-    ].map((variable) => block.style.getPropertyValue(variable));
-
-    const firstBlock = requireBlock(FIRST_EVENT.id);
+    const firstBlock = requireBlock(FIRST_KEY);
     expect(firstBlock.classList.contains(CSS_CLASSES.EVENT_BLOCK)).toBe(true);
-    expect(readVariables(firstBlock)).toEqual(FIRST_BLOCK_VARIABLES);
-    expect(readVariables(requireBlock(SECOND_EVENT.id))).toEqual(SECOND_BLOCK_VARIABLES);
+    expect(readBlockVariables(firstBlock)).toEqual(FIRST_BLOCK_VARIABLES);
+    expect(readBlockVariables(requireBlock(SECOND_KEY))).toEqual(SECOND_BLOCK_VARIABLES);
+  });
+
+  it('renders a block for every day covered by a timed multi day event', () => {
+    renderDefault();
+    const [todayColumn, holidayColumn] = queryAll(COLUMN_SELECTOR);
+    expect(requireBlock(NIGHT_KEY, todayColumn).classList.contains(CSS_CLASSES.EVENT_CONTINUES_AFTER)).toBe(true);
+    expect(readBlockVariables(requireBlock(NIGHT_KEY, holidayColumn))).toEqual(NIGHT_LAST_BLOCK_VARIABLES);
   });
 
   it('shows the now line only in the today column at the current time', () => {
@@ -197,7 +247,7 @@ describe('TimeGridView', () => {
 
   it('renders no now line without a today column and ticks safely', () => {
     view.start();
-    view.render(createLayout([HOLIDAY_COLUMN]), eventsByDate, holidaysByDate);
+    view.render(createLayout([HOLIDAY_COLUMN]), segmentsByDate, holidaysByDate);
     vi.advanceTimersByTime(CURRENT_TIME_TICK_MS);
     expect(view.element.querySelector(NOW_LINE_SELECTOR)).toBeNull();
   });
@@ -217,14 +267,20 @@ describe('TimeGridView', () => {
 
   it('activates an event when its block is clicked', () => {
     renderDefault();
-    dispatchMouse(requireBlock(FIRST_EVENT.id).firstElementChild as Element, 'click');
-    expect(handlers.onEventActivate).toHaveBeenCalledWith(FIRST_EVENT.id);
+    dispatchMouse(requireBlock(FIRST_KEY).firstElementChild as Element, 'click');
+    expect(handlers.onEventActivate).toHaveBeenCalledWith(FIRST_KEY);
   });
 
-  it('activates with an empty id when the block lost its event id', () => {
+  it('activates an all day event when its pill is clicked', () => {
     renderDefault();
-    const block = requireBlock(FIRST_EVENT.id);
-    delete block.dataset.eventId;
+    dispatchMouse(requireBlock(ALL_DAY_KEY), 'click');
+    expect(handlers.onEventActivate).toHaveBeenCalledWith(ALL_DAY_KEY);
+  });
+
+  it('activates with an empty key when the block lost its event key', () => {
+    renderDefault();
+    const block = requireBlock(FIRST_KEY);
+    delete block.dataset.eventKey;
     dispatchMouse(block, 'click');
     expect(handlers.onEventActivate).toHaveBeenCalledWith(EMPTY_DATE);
   });
@@ -254,7 +310,7 @@ describe('TimeGridView', () => {
 
   it('does not activate a slot when double clicking an event block', () => {
     renderDefault();
-    dispatchMouse(requireBlock(FIRST_EVENT.id), 'dblclick');
+    dispatchMouse(requireBlock(FIRST_KEY), 'dblclick');
     expect(handlers.onSlotActivate).not.toHaveBeenCalled();
   });
 
@@ -267,29 +323,60 @@ describe('TimeGridView', () => {
   it('moves a dropped event to the snapped start minus the grab offset', () => {
     renderDefault();
     const holidayColumn = queryAll(COLUMN_SELECTOR)[1];
-    const payload = { eventId: FIRST_EVENT.id, offsetMinutes: DRAG_OFFSET_MINUTES };
     mockRect(holidayColumn, COLUMN_TOP);
-    holidayColumn.dispatchEvent(createDragEvent(DRAG_EVENTS.DROP, { dataTransfer: createPayloadTransfer(payload), clientY: DROP_POINTER_Y }));
-    expect(handlers.onEventDrop).toHaveBeenCalledWith(FIRST_EVENT.id, { date: HOLIDAY_ISO, startMinutes: DROPPED_START_MINUTES });
+    dropOn(holidayColumn, FIRST_KEY, NO_DAY_OFFSET, DRAG_OFFSET_MINUTES);
+    expect(handlers.onEventDrop).toHaveBeenCalledWith(FIRST_KEY, { date: HOLIDAY_ISO, startMinutes: DROPPED_START_MINUTES });
+  });
+
+  it('moves a dropped later segment by its day offset while keeping the time', () => {
+    renderDefault();
+    dropOn(queryAll(COLUMN_SELECTOR)[1], NIGHT_KEY, SECOND_DAY_OFFSET, KEEP_TIME);
+    expect(handlers.onEventDrop).toHaveBeenCalledWith(NIGHT_KEY, { date: TODAY_ISO });
   });
 
   it('moves a dropped event to an empty date when the column lost its date', () => {
     renderDefault();
     const holidayColumn = queryAll(COLUMN_SELECTOR)[1];
-    const payload = { eventId: FIRST_EVENT.id, offsetMinutes: DRAG_OFFSET_MINUTES };
     mockRect(holidayColumn, COLUMN_TOP);
     delete holidayColumn.dataset.date;
-    holidayColumn.dispatchEvent(createDragEvent(DRAG_EVENTS.DROP, { dataTransfer: createPayloadTransfer(payload), clientY: DROP_POINTER_Y }));
-    expect(handlers.onEventDrop).toHaveBeenCalledWith(FIRST_EVENT.id, { date: EMPTY_DATE, startMinutes: DROPPED_START_MINUTES });
+    dropOn(holidayColumn, FIRST_KEY, NO_DAY_OFFSET, DRAG_OFFSET_MINUTES);
+    expect(handlers.onEventDrop).toHaveBeenCalledWith(FIRST_KEY, { date: EMPTY_DATE, startMinutes: DROPPED_START_MINUTES });
+  });
+
+  it('moves an event dropped on the all day row to that date only', () => {
+    renderDefault();
+    dropOn(queryAll(ALL_DAY_CELL_SELECTOR)[0], ALL_DAY_KEY, NO_DAY_OFFSET, KEEP_TIME);
+    expect(handlers.onEventDrop).toHaveBeenCalledWith(ALL_DAY_KEY, { date: TODAY_ISO });
+  });
+
+  it('moves an event dropped on the all day row to an empty date when the cell lost its date', () => {
+    renderDefault();
+    const [todayCell] = queryAll(ALL_DAY_CELL_SELECTOR);
+    delete todayCell.dataset.date;
+    dropOn(todayCell, ALL_DAY_KEY, NO_DAY_OFFSET, KEEP_TIME);
+    expect(handlers.onEventDrop).toHaveBeenCalledWith(ALL_DAY_KEY, { date: EMPTY_DATE });
   });
 
   it('starts dragging a block with the offset between pointer and block top', () => {
     renderDefault();
-    const block = requireBlock(FIRST_EVENT.id);
-    const dataTransfer = new DataTransfer();
+    const block = requireBlock(FIRST_KEY);
     mockRect(queryAll(COLUMN_SELECTOR)[0], COLUMN_TOP);
     mockRect(block, BLOCK_TOP);
-    block.dispatchEvent(createDragEvent(DRAG_EVENTS.START, { dataTransfer, clientY: POINTER_Y }));
-    expect(readTransferPayload(dataTransfer)).toEqual({ eventId: FIRST_EVENT.id, offsetMinutes: DRAG_OFFSET_MINUTES });
+    const dataTransfer = startDragOf(block);
+    expect(readTransferPayload(dataTransfer)).toEqual({ eventKey: FIRST_KEY, dayOffset: NO_DAY_OFFSET, offsetMinutes: DRAG_OFFSET_MINUTES });
+  });
+
+  it('starts dragging a later segment block with its day offset and without a time offset', () => {
+    renderDefault();
+    const dataTransfer = startDragOf(requireBlock(NIGHT_KEY, queryAll(COLUMN_SELECTOR)[1]));
+    expect(readTransferPayload(dataTransfer)).toEqual({ eventKey: NIGHT_KEY, dayOffset: SECOND_DAY_OFFSET, offsetMinutes: KEEP_TIME });
+  });
+
+  it('starts dragging an all day pill without a time offset', () => {
+    renderDefault();
+    const pill = requireBlock(ALL_DAY_KEY);
+    const dataTransfer = startDragOf(pill);
+    expect(pill.draggable).toBe(true);
+    expect(readTransferPayload(dataTransfer)).toEqual({ eventKey: ALL_DAY_KEY, dayOffset: NO_DAY_OFFSET, offsetMinutes: KEEP_TIME });
   });
 });

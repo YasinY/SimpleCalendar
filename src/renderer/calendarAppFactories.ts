@@ -1,5 +1,6 @@
 import type { EventDialogHandlers } from './dialogs/eventDialogHandlers';
 import type { EventEditor } from './dialogs/eventEditor';
+import type { ScopeChooser } from './dialogs/scopeChooser';
 import type { SettingsDialogHandlers } from './dialogs/settingsDialogHandlers';
 import type { SettingsEditor } from './dialogs/settingsEditor';
 import type { MonthRenderer } from './views/monthRenderer';
@@ -14,5 +15,6 @@ export interface CalendarAppFactories {
   createTimeGridView(handlers: TimeGridHandlers): TimeGridRenderer;
   createEventDialog(handlers: EventDialogHandlers): EventEditor;
   createSettingsDialog(handlers: SettingsDialogHandlers): SettingsEditor;
+  createScopePrompt(): ScopeChooser;
   createWeatherBadge(options: WeatherBadgeOptions): WeatherPresenter;
 }

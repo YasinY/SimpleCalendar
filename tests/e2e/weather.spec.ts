@@ -13,8 +13,8 @@ import {
   mockGeocoding,
   type RouteFailure
 } from './support/weatherRoutes';
-import { UNKNOWN_CONDITION, WEATHER_CONDITIONS, WEATHER_REFRESH_INTERVAL_MS } from '../../src/renderer/weather/weatherConstants';
-import type { Settings } from '../../src/shared/settings';
+import { UNKNOWN_CONDITION, WEATHER_CONDITIONS, WEATHER_REFRESH_INTERVAL_MS } from '@renderer/weather/weatherConstants';
+import type { Settings } from '@shared/settings';
 
 const SELECTORS = {
   BADGE: '#weatherBadge',

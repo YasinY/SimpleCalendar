@@ -1,5 +1,6 @@
-import { REMINDER_CHECK_INTERVAL_MS } from '../constants';
-import { isDue, toEventDate } from './reminderRules';
+import { REMINDER_CHECK_INTERVAL_MS } from '@main/constants';
+import { findLatestDue, groupBySeries, toEventDate } from './reminderRules';
+import { toIsoDate } from '@shared/isoDate';
 import type { ReminderNotifier } from './reminderNotifier';
 import type { ReminderSource } from './reminderSource';
 
@@ -27,10 +28,11 @@ export class ReminderScheduler {
 
   check(): void {
     const now = new Date();
-    for (const event of this.#store.getPendingReminders()) {
-      if (!isDue(event, now)) continue;
-      this.#notify(event, toEventDate(event));
-      this.#store.markNotified(event.id);
+    for (const occurrences of groupBySeries(this.#store.getPendingReminders(toIsoDate(now))).values()) {
+      const due = findLatestDue(occurrences, now);
+      if (!due) continue;
+      this.#notify(due, toEventDate(due));
+      this.#store.markNotified(due.id, due.date);
     }
   }
 }

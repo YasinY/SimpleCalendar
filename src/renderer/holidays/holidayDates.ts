@@ -1,5 +1,5 @@
-import { DAYS_PER_WEEK } from '../constants';
-import { addDays, toIsoDate } from '../date/dateUtils';
+import { DAYS_PER_WEEK } from '@renderer/constants';
+import { addDays, toIsoDate } from '@renderer/date/dateUtils';
 import { ALL_STATE_CODES, HOLIDAYS, HOLIDAY_RULE } from './holidayConstants';
 import type { Holiday } from './holiday';
 

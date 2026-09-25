@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DROP_EFFECT_MOVE } from '../../../../src/renderer/constants';
-import { DRAG_EVENTS } from '../../../../src/renderer/dragDrop/dragTransfer';
-import { DropZoneTracker } from '../../../../src/renderer/dragDrop/DropZoneTracker';
-import { createDragEvent, createPayloadTransfer, createRawTransfer } from '../../../support/dragEvents';
-import type { DropHandler } from '../../../../src/renderer/dragDrop/dropHandler';
+import { DROP_EFFECT_MOVE } from '@renderer/constants';
+import { DRAG_EVENTS } from '@renderer/dragDrop/dragTransfer';
+import { DropZoneTracker } from '@renderer/dragDrop/DropZoneTracker';
+import { createDragEvent, createPayloadTransfer, createRawTransfer } from '@tests/support/dragEvents';
+import type { DropHandler } from '@renderer/dragDrop/dropHandler';
 
 const ZONE_CLASS = 'zone';
 const ZONE_SELECTOR = '.' + ZONE_CLASS;
 const HIGHLIGHT_CLASS = 'highlight';
 const HIGHLIGHT_SELECTOR = '.' + HIGHLIGHT_CLASS;
-const PAYLOAD = { eventId: 'event-1', offsetMinutes: 0 };
+const PAYLOAD = { eventKey: 'event-1@2026-09-16', dayOffset: 0, offsetMinutes: 0 };
 const INVALID_JSON = '{not json';
 
 function createZone(): HTMLElement {

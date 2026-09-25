@@ -1,4 +1,4 @@
-import { DAY_SUFFIX, DAYS_PER_WEEK, DEFAULT_VIEW_MODE, MONTH_NAMES, VIEW_MODES } from '../constants';
+import { DAY_SUFFIX, DAYS_PER_WEEK, DEFAULT_VIEW_MODE, MONTH_NAMES, VIEW_MODES } from '@renderer/constants';
 import {
   addDays,
   addMonths,
@@ -10,8 +10,8 @@ import {
   toDateRange
 } from './dateUtils';
 import type { ViewTitle } from './viewTitle';
-import type { DateRange } from '../../shared/dateRange';
-import type { ViewMode } from '../../shared/viewMode';
+import type { DateRange } from '@shared/dateRange';
+import type { ViewMode } from '@shared/viewMode';
 
 const RANGE_SEPARATOR = ' – ';
 const LAST_WEEK_DAY_OFFSET = DAYS_PER_WEEK - 1;

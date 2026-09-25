@@ -1,5 +1,5 @@
-import { DRAG_DATA_TYPE } from '../../src/renderer/constants';
-import type { DragPayload } from '../../src/renderer/dragDrop/dragPayload';
+import { DRAG_DATA_TYPE } from '@renderer/constants';
+import type { DragPayload } from '@renderer/dragDrop/dragPayload';
 
 export interface DragEventFields {
   dataTransfer?: DataTransfer | null;

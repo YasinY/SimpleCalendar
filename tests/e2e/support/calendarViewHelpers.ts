@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
-import type { CalendarEvent } from '../../../src/shared/calendarEvent';
-import type { EventInput } from '../../../src/shared/eventInput';
+import type { CalendarEvent } from '@shared/calendarEvent';
+import type { EventInput } from '@shared/eventInput';
 
 const MINUTES_PER_DAY = 1440;
 const HALF = 2;
@@ -28,11 +28,23 @@ export const SELECTORS = {
   TIME_GRID_BODY: '.time-grid__body',
   TIME_GRID_COLUMNS: '.time-grid__columns',
   TIME_GRID_COLUMN: '.time-grid__column',
+  ALL_DAY_CELL: '.time-grid__all-day-cell',
   DIALOG_OVERLAY: '#dialogOverlay',
   DIALOG_HEADING: '[data-dialog-heading]',
   DIALOG_TITLE: '[data-dialog-title]',
   DIALOG_TIME: '[data-dialog-time]',
-  DIALOG_SUBMIT: '[data-dialog-submit]'
+  DIALOG_SUBMIT: '[data-dialog-submit]',
+  DIALOG_DELETE: '[data-dialog-delete]',
+  SCOPE_OVERLAY: '#scopeOverlay',
+  SCOPE_OCCURRENCE: '[data-scope-occurrence]',
+  SCOPE_SERIES: '[data-scope-series]',
+  SCOPE_CANCEL: '[data-scope-cancel]'
+} as const;
+
+export const EVENT_CLASSES = {
+  CONTINUES_BEFORE: /event--continues-before/,
+  CONTINUES_AFTER: /event--continues-after/,
+  RECURRING: /event--recurring/
 } as const;
 
 export const VIEW_BUTTONS = {
@@ -59,6 +71,10 @@ export async function fetchEvents(page: Page): Promise<CalendarEvent[]> {
   return page.evaluate((range) => window.calendarApi.getEvents(range), WIDE_RANGE);
 }
 
+export async function fetchEventsBetween(page: Page, from: string, to: string): Promise<CalendarEvent[]> {
+  return page.evaluate((range) => window.calendarApi.getEvents(range), { from, to });
+}
+
 export async function fetchEventByTitle(page: Page, title: string): Promise<CalendarEvent | undefined> {
   const events = await fetchEvents(page);
   return events.find((event) => event.title === title);
@@ -66,6 +82,10 @@ export async function fetchEventByTitle(page: Page, title: string): Promise<Cale
 
 export function dayCell(page: Page, isoDate: string): Locator {
   return page.locator(SELECTORS.DAY + '[data-date="' + isoDate + '"]');
+}
+
+export function allDayCell(page: Page, isoDate: string): Locator {
+  return page.locator(SELECTORS.ALL_DAY_CELL + '[data-date="' + isoDate + '"]');
 }
 
 export function timeGridColumn(page: Page, isoDate: string): Locator {
@@ -107,6 +127,19 @@ export async function setAttribute(locator: Locator, name: string, value: string
 
 export async function readStyleVariable(locator: Locator, name: string): Promise<string> {
   return locator.evaluate((element, variable) => (element as HTMLElement).style.getPropertyValue(variable), name);
+}
+
+export async function expectClassState(locator: Locator, pattern: RegExp, present: boolean): Promise<void> {
+  if (present) {
+    await expect(locator).toHaveClass(pattern);
+    return;
+  }
+  await expect(locator).not.toHaveClass(pattern);
+}
+
+export async function expectContinuation(pill: Locator, continuesBefore: boolean, continuesAfter: boolean): Promise<void> {
+  await expectClassState(pill, EVENT_CLASSES.CONTINUES_BEFORE, continuesBefore);
+  await expectClassState(pill, EVENT_CLASSES.CONTINUES_AFTER, continuesAfter);
 }
 
 export function collectPageErrors(page: Page): Error[] {

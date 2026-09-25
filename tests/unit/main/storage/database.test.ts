@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { drizzle } from 'drizzle-orm/node-sqlite';
-import { openCalendarDatabase, type CalendarDatabase } from '../../../../src/main/storage/database';
+import { openCalendarDatabase, type CalendarDatabase } from '@main/storage/database';
 
 const IN_MEMORY = ':memory:';
 

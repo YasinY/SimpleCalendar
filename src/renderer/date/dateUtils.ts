@@ -6,16 +6,18 @@ import {
   MINUTES_PER_HOUR,
   MONTH_NAMES,
   WEEKDAY_NAMES
-} from '../constants';
+} from '@renderer/constants';
+import { addDays, fromIsoDate, toIsoDate } from '@shared/isoDate';
 import type { DayColumnLayout } from './dayColumnLayout';
 import type { MonthCell } from './monthCell';
 import type { MonthGrid } from './monthGrid';
 import type { TimedEvent } from './timedEvent';
-import type { DateRange } from '../../shared/dateRange';
+import type { DateRange } from '@shared/dateRange';
 
-const ISO_DATE_PAD = 2;
+export { addDays, fromIsoDate, toIsoDate };
+
+const TIME_PAD = 2;
 const PAD_CHARACTER = '0';
-const ISO_SEPARATOR = '-';
 const TIME_SEPARATOR = ':';
 const MONTH_OFFSET = 1;
 const SUNDAY_INDEX = 0;
@@ -32,16 +34,7 @@ interface MonthGridBounds {
 }
 
 function pad(value: number): string {
-  return String(value).padStart(ISO_DATE_PAD, PAD_CHARACTER);
-}
-
-export function toIsoDate(date: Date): string {
-  return [date.getFullYear(), pad(date.getMonth() + MONTH_OFFSET), pad(date.getDate())].join(ISO_SEPARATOR);
-}
-
-export function fromIsoDate(isoDate: string): Date {
-  const [year, month, day] = isoDate.split(ISO_SEPARATOR).map(Number);
-  return new Date(year, month - MONTH_OFFSET, day);
+  return String(value).padStart(TIME_PAD, PAD_CHARACTER);
 }
 
 export function startOfDay(date: Date): Date {
@@ -50,10 +43,6 @@ export function startOfDay(date: Date): Date {
 
 export function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), FIRST_MONTH_DAY);
-}
-
-export function addDays(date: Date, delta: number): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + delta);
 }
 
 export function addMonths(date: Date, delta: number): Date {

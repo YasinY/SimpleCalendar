@@ -23,6 +23,7 @@ export interface MainProcessHookGlobals {
   __e2eTray: Tray;
   __e2eTrayMenu: Menu;
   __e2eLoginItemSettings: LoginItemSettings[];
+  __e2eConsoleMessages: string[];
 }
 
 export const DEFAULT_USER_DATA_LAUNCH_OPTIONS: UserDataLaunchOptions = { mainProcessHooks: false, userDataOverride: true };

@@ -1,20 +1,26 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { EventDialog } from '../../../../src/renderer/dialogs/EventDialog';
-import { DiscardPrompt } from '../../../../src/renderer/dialogs/DiscardPrompt';
+import { EventDialog } from '@renderer/dialogs/EventDialog';
+import { DiscardPrompt } from '@renderer/dialogs/DiscardPrompt';
 import {
   ALL_DAY_TIME,
   DEFAULT_EVENT_TIME,
   DIALOG_LABELS,
   HIDDEN_ATTRIBUTE,
+  NO_DATE,
   NO_END_TIME,
+  RECURRENCE_NONE_VALUE,
+  RECURRENCE_OPTIONS,
+  RECURRENCE_UNIT_LABELS,
   REMINDER_NONE_VALUE,
   REMINDER_OPTIONS
-} from '../../../../src/renderer/constants';
-import { formatLongDate, fromIsoDate } from '../../../../src/renderer/date/dateUtils';
-import { DEFAULT_EVENT_COLOR, EVENT_COLORS } from '../../../../src/renderer/events/eventColors';
-import type { EventInput } from '../../../../src/shared/eventInput';
-import { createCalendarEvent } from '../../../support/calendarEventFactory';
-import { mountIndexDocument, requireById } from '../../../support/indexDocument';
+} from '@renderer/constants';
+import { formatLongDate, fromIsoDate } from '@renderer/date/dateUtils';
+import { DEFAULT_EVENT_COLOR, EVENT_COLORS } from '@renderer/events/eventColors';
+import type { CalendarEvent } from '@shared/calendarEvent';
+import type { EventInput } from '@shared/eventInput';
+import type { Recurrence } from '@shared/recurrence';
+import { createCalendarEvent } from '@tests/support/calendarEventFactory';
+import { mountIndexDocument, requireById } from '@tests/support/indexDocument';
 
 const OVERLAY_ID = 'dialogOverlay';
 const DISCARD_OVERLAY_ID = 'discardOverlay';
@@ -29,6 +35,14 @@ const NOTES = 'Raum 4';
 const PADDED_TITLE = '  ' + TITLE + '  ';
 const PADDED_NOTES = '  ' + NOTES + '  ';
 const EMPTY_DATE = '';
+const EMPTY_TEXT = '';
+const END_DATE = '2026-09-18';
+const UNTIL_DATE = '2026-12-31';
+const INTERVAL = 2;
+const DEFAULT_INTERVAL_VALUE = '1';
+const MONTHLY_RECURRENCE: Recurrence = { frequency: 'monthly', interval: INTERVAL, until: UNTIL_DATE };
+const WEEKLY_FREQUENCY = 'weekly';
+const CHANGE_EVENT = 'change';
 
 const SELECTORS = {
   FORM: '[data-dialog-form]',
@@ -37,7 +51,13 @@ const SELECTORS = {
   TITLE_INPUT: '[data-dialog-title]',
   TIME_INPUT: '[data-dialog-time]',
   END_TIME_INPUT: '[data-dialog-end-time]',
+  END_DATE_INPUT: '[data-dialog-end-date]',
   ALL_DAY_INPUT: '[data-dialog-all-day]',
+  RECURRENCE_SELECT: '[data-dialog-recurrence]',
+  RECURRENCE_DETAILS: '[data-dialog-recurrence-details]',
+  INTERVAL_INPUT: '[data-dialog-interval]',
+  INTERVAL_UNIT: '[data-dialog-interval-unit]',
+  UNTIL_INPUT: '[data-dialog-until]',
   NOTES_INPUT: '[data-dialog-notes]',
   REMINDER_SELECT: '[data-dialog-reminder]',
   COLOR_GROUP: '[data-dialog-colors]',
@@ -55,14 +75,20 @@ interface DialogFixture {
   titleInput: HTMLInputElement;
   timeInput: HTMLInputElement;
   endTimeInput: HTMLInputElement;
+  endDateInput: HTMLInputElement;
   allDayInput: HTMLInputElement;
+  recurrenceSelect: HTMLSelectElement;
+  recurrenceDetails: HTMLElement;
+  intervalInput: HTMLInputElement;
+  intervalUnit: HTMLElement;
+  untilInput: HTMLInputElement;
   notesInput: HTMLTextAreaElement;
   reminderSelect: HTMLSelectElement;
   colorGroup: HTMLElement;
   submitButton: HTMLButtonElement;
   deleteButton: HTMLButtonElement;
-  onSubmit: Mock<(payload: EventInput) => void>;
-  onDelete: Mock<(eventId: string) => void>;
+  onSubmit: Mock<(payload: EventInput, editing: CalendarEvent | null) => void>;
+  onDelete: Mock<(event: CalendarEvent) => void>;
 }
 
 function query<T extends Element>(root: HTMLElement, selector: string): T {
@@ -71,8 +97,8 @@ function query<T extends Element>(root: HTMLElement, selector: string): T {
 
 function createFixture(): DialogFixture {
   const overlay = requireById(OVERLAY_ID);
-  const onSubmit = vi.fn<(payload: EventInput) => void>();
-  const onDelete = vi.fn<(eventId: string) => void>();
+  const onSubmit = vi.fn<(payload: EventInput, editing: CalendarEvent | null) => void>();
+  const onDelete = vi.fn<(event: CalendarEvent) => void>();
   const dialog = new EventDialog(overlay, { onSubmit, onDelete }, new DiscardPrompt(requireById(DISCARD_OVERLAY_ID)));
   return {
     dialog,
@@ -83,7 +109,13 @@ function createFixture(): DialogFixture {
     titleInput: query(overlay, SELECTORS.TITLE_INPUT),
     timeInput: query(overlay, SELECTORS.TIME_INPUT),
     endTimeInput: query(overlay, SELECTORS.END_TIME_INPUT),
+    endDateInput: query(overlay, SELECTORS.END_DATE_INPUT),
     allDayInput: query(overlay, SELECTORS.ALL_DAY_INPUT),
+    recurrenceSelect: query(overlay, SELECTORS.RECURRENCE_SELECT),
+    recurrenceDetails: query(overlay, SELECTORS.RECURRENCE_DETAILS),
+    intervalInput: query(overlay, SELECTORS.INTERVAL_INPUT),
+    intervalUnit: query(overlay, SELECTORS.INTERVAL_UNIT),
+    untilInput: query(overlay, SELECTORS.UNTIL_INPUT),
     notesInput: query(overlay, SELECTORS.NOTES_INPUT),
     reminderSelect: query(overlay, SELECTORS.REMINDER_SELECT),
     colorGroup: query(overlay, SELECTORS.COLOR_GROUP),
@@ -108,10 +140,11 @@ describe('EventDialog', () => {
     mountIndexDocument();
   });
 
-  it('fills the reminder select and color swatches on construction', () => {
-    const { reminderSelect, colorGroup } = createFixture();
+  it('fills the reminder and recurrence selects and color swatches on construction', () => {
+    const { reminderSelect, recurrenceSelect, colorGroup } = createFixture();
 
     expect(Array.from(reminderSelect.options, (option) => option.value)).toEqual(REMINDER_OPTIONS.map(({ value }) => value));
+    expect(Array.from(recurrenceSelect.options, (option) => option.value)).toEqual(RECURRENCE_OPTIONS.map(({ value }) => value));
     expect(colorGroup.querySelectorAll('input')).toHaveLength(EVENT_COLORS.length);
   });
 
@@ -125,10 +158,18 @@ describe('EventDialog', () => {
     expect(fixture.submitButton.textContent).toBe(DIALOG_LABELS.CREATE_SUBMIT);
     expect(fixture.dateLabel.textContent).toBe(formatLongDate(fromIsoDate(ISO_DATE)));
     expect(fixture.deleteButton.hidden).toBe(true);
-    expect(fixture.titleInput.value).toBe('');
+    expect(fixture.titleInput.value).toBe(EMPTY_TEXT);
     expect(fixture.timeInput.value).toBe(DEFAULT_EVENT_TIME);
     expect(fixture.endTimeInput.value).toBe(NO_END_TIME);
+    expect(fixture.endDateInput.value).toBe(NO_DATE);
+    expect(fixture.endDateInput.min).toBe(ISO_DATE);
     expect(fixture.allDayInput.checked).toBe(false);
+    expect(fixture.recurrenceSelect.value).toBe(RECURRENCE_NONE_VALUE);
+    expect(fixture.recurrenceDetails.hidden).toBe(true);
+    expect(fixture.intervalInput.value).toBe(DEFAULT_INTERVAL_VALUE);
+    expect(fixture.intervalUnit.textContent).toBe(EMPTY_TEXT);
+    expect(fixture.untilInput.value).toBe(NO_DATE);
+    expect(fixture.untilInput.min).toBe(ISO_DATE);
     expect(fixture.timeInput.disabled).toBe(false);
     expect(fixture.reminderSelect.value).toBe(REMINDER_NONE_VALUE);
     expect(checkedColor(fixture.colorGroup)).toBe(DEFAULT_EVENT_COLOR);
@@ -143,14 +184,16 @@ describe('EventDialog', () => {
     expect(fixture.timeInput.value).toBe(CUSTOM_TIME);
   });
 
-  it('opens an edit form prefilled from a timed event with end time', () => {
+  it('opens an edit form prefilled from a timed recurring multi day event with end time', () => {
     const fixture = createFixture();
     const event = createCalendarEvent({
       title: TITLE,
       notes: NOTES,
       endTime: END_TIME,
+      endDate: END_DATE,
       color: KNOWN_COLOR,
-      reminderMinutes: REMINDER_MINUTES
+      reminderMinutes: REMINDER_MINUTES,
+      recurrence: MONTHLY_RECURRENCE
     });
 
     fixture.dialog.openForEvent(event);
@@ -161,6 +204,14 @@ describe('EventDialog', () => {
     expect(fixture.titleInput.value).toBe(TITLE);
     expect(fixture.timeInput.value).toBe(event.time);
     expect(fixture.endTimeInput.value).toBe(END_TIME);
+    expect(fixture.endDateInput.value).toBe(END_DATE);
+    expect(fixture.endDateInput.min).toBe(event.date);
+    expect(fixture.recurrenceSelect.value).toBe(MONTHLY_RECURRENCE.frequency);
+    expect(fixture.recurrenceDetails.hidden).toBe(false);
+    expect(fixture.intervalInput.value).toBe(String(INTERVAL));
+    expect(fixture.intervalUnit.textContent).toBe(RECURRENCE_UNIT_LABELS[MONTHLY_RECURRENCE.frequency]);
+    expect(fixture.untilInput.value).toBe(UNTIL_DATE);
+    expect(fixture.untilInput.min).toBe(event.date);
     expect(fixture.notesInput.value).toBe(NOTES);
     expect(fixture.reminderSelect.value).toBe(String(REMINDER_MINUTES));
     expect(checkedColor(fixture.colorGroup)).toBe(KNOWN_COLOR);
@@ -173,6 +224,9 @@ describe('EventDialog', () => {
     fixture.dialog.openForEvent(createCalendarEvent({ allDay: true, color: UNKNOWN_COLOR }));
 
     expect(fixture.endTimeInput.value).toBe(NO_END_TIME);
+    expect(fixture.endDateInput.value).toBe(NO_DATE);
+    expect(fixture.recurrenceSelect.value).toBe(RECURRENCE_NONE_VALUE);
+    expect(fixture.recurrenceDetails.hidden).toBe(true);
     expect(fixture.allDayInput.checked).toBe(true);
     expect(fixture.timeInput.disabled).toBe(true);
     expect(fixture.endTimeInput.disabled).toBe(true);
@@ -182,22 +236,32 @@ describe('EventDialog', () => {
 
   it('submits a trimmed timed payload for the active event', () => {
     const fixture = createFixture();
-    const event = createCalendarEvent({ endTime: END_TIME, color: KNOWN_COLOR, reminderMinutes: REMINDER_MINUTES });
+    const event = createCalendarEvent({
+      endTime: END_TIME,
+      endDate: END_DATE,
+      color: KNOWN_COLOR,
+      reminderMinutes: REMINDER_MINUTES,
+      recurrence: MONTHLY_RECURRENCE
+    });
     fixture.dialog.openForEvent(event);
     fixture.titleInput.value = PADDED_TITLE;
     fixture.notesInput.value = PADDED_NOTES;
 
     expect(submit(fixture)).toEqual({
       id: event.id,
+      occurrenceDate: event.date,
       date: event.date,
+      endDate: END_DATE,
       time: event.time,
       endTime: END_TIME,
       allDay: false,
       color: KNOWN_COLOR,
       title: TITLE,
       notes: NOTES,
-      reminderMinutes: REMINDER_MINUTES
+      reminderMinutes: REMINDER_MINUTES,
+      recurrence: MONTHLY_RECURRENCE
     });
+    expect(fixture.onSubmit.mock.lastCall?.[1]).toBe(event);
   });
 
   it('submits an all day payload without times for a new event', () => {
@@ -207,15 +271,37 @@ describe('EventDialog', () => {
 
     expect(submit(fixture)).toEqual({
       id: null,
+      occurrenceDate: null,
       date: ISO_DATE,
+      endDate: null,
       time: ALL_DAY_TIME,
       endTime: null,
       allDay: true,
       color: DEFAULT_EVENT_COLOR,
-      title: '',
-      notes: '',
-      reminderMinutes: null
+      title: EMPTY_TEXT,
+      notes: EMPTY_TEXT,
+      reminderMinutes: null,
+      recurrence: null
     });
+    expect(fixture.onSubmit.mock.lastCall?.[1]).toBeNull();
+  });
+
+  it('shows the recurrence details with the unit once a frequency is chosen and submits it', () => {
+    const fixture = createFixture();
+    fixture.dialog.openForDate(ISO_DATE);
+
+    fixture.recurrenceSelect.value = WEEKLY_FREQUENCY;
+    fixture.recurrenceSelect.dispatchEvent(new Event(CHANGE_EVENT));
+
+    expect(fixture.recurrenceDetails.hidden).toBe(false);
+    expect(fixture.intervalUnit.textContent).toBe(RECURRENCE_UNIT_LABELS[WEEKLY_FREQUENCY]);
+    expect(submit(fixture).recurrence).toEqual({ frequency: WEEKLY_FREQUENCY, interval: Number(DEFAULT_INTERVAL_VALUE), until: null });
+
+    fixture.recurrenceSelect.value = RECURRENCE_NONE_VALUE;
+    fixture.recurrenceSelect.dispatchEvent(new Event(CHANGE_EVENT));
+
+    expect(fixture.recurrenceDetails.hidden).toBe(true);
+    expect(fixture.intervalUnit.textContent).toBe(EMPTY_TEXT);
   });
 
   it('falls back to the default color when no swatch is checked', () => {
@@ -238,7 +324,7 @@ describe('EventDialog', () => {
 
     fixture.dialog.openForEvent(event);
     fixture.deleteButton.click();
-    expect(fixture.onDelete).toHaveBeenCalledExactlyOnceWith(event.id);
+    expect(fixture.onDelete).toHaveBeenCalledExactlyOnceWith(event);
   });
 
   it('toggles the time inputs when all day changes', () => {
@@ -246,7 +332,7 @@ describe('EventDialog', () => {
     fixture.dialog.openForDate(ISO_DATE);
 
     fixture.allDayInput.checked = true;
-    fixture.allDayInput.dispatchEvent(new Event('change'));
+    fixture.allDayInput.dispatchEvent(new Event(CHANGE_EVENT));
 
     expect(fixture.timeInput.disabled).toBe(true);
     expect(fixture.endTimeInput.disabled).toBe(true);

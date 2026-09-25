@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { IPC_CHANNELS } from '../../../src/shared/ipcChannels';
+import { IPC_CHANNELS } from '@shared/ipcChannels';
 
 const EXPECTED_CHANNELS = {
   GET_EVENTS: 'events:get',
   SAVE_EVENT: 'events:save',
+  SAVE_OCCURRENCE: 'events:save-occurrence',
   DELETE_EVENT: 'events:delete',
+  DELETE_OCCURRENCE: 'events:delete-occurrence',
   GET_SETTINGS: 'settings:get',
   UPDATE_SETTINGS: 'settings:update',
   WINDOW_MINIMIZE: 'window:minimize',

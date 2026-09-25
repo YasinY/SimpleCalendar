@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchCurrentWeather, geocodeCity, resolveCondition } from '../../../../src/renderer/weather/weatherApi';
-import { WeatherBadge } from '../../../../src/renderer/weather/WeatherBadge';
+import { fetchCurrentWeather, geocodeCity, resolveCondition } from '@renderer/weather/weatherApi';
+import { WeatherBadge } from '@renderer/weather/WeatherBadge';
 import {
   TEMPERATURE_SUFFIX,
   WEATHER_CONDITIONS,
@@ -8,10 +8,10 @@ import {
   WEATHER_REFRESH_INTERVAL_MS,
   WEATHER_STALE_AFTER_MS,
   WEATHER_TOOLTIP_SEPARATOR
-} from '../../../../src/renderer/weather/weatherConstants';
-import type { WeatherLocation } from '../../../../src/shared/weatherLocation';
+} from '@renderer/weather/weatherConstants';
+import type { WeatherLocation } from '@shared/weatherLocation';
 
-vi.mock('../../../../src/renderer/weather/weatherApi', () => ({
+vi.mock('@renderer/weather/weatherApi', () => ({
   fetchCurrentWeather: vi.fn(),
   geocodeCity: vi.fn(),
   resolveCondition: vi.fn()

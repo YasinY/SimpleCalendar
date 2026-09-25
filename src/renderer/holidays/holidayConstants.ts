@@ -1,6 +1,6 @@
 import type { Holiday } from './holiday';
 import type { State } from './state';
-import type { SelectOption } from '../selectOption';
+import type { SelectOption } from '@renderer/selectOption';
 
 export const STATES: State[] = [
   { code: 'BW', name: 'Baden-Württemberg' },

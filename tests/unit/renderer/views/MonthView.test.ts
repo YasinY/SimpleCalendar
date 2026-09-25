@@ -6,16 +6,17 @@ import {
   HOLIDAY_NAME_SEPARATOR,
   MIN_STRETCHED_DURATION_STEPS,
   WEEKDAY_LABELS
-} from '../../../../src/renderer/constants';
-import { DRAG_EVENTS } from '../../../../src/renderer/dragDrop/dragTransfer';
-import { MonthView } from '../../../../src/renderer/views/MonthView';
-import { createCalendarEvent } from '../../../support/calendarEventFactory';
-import { createDragEvent, createPayloadTransfer, readTransferPayload } from '../../../support/dragEvents';
-import type { MonthCell } from '../../../../src/renderer/date/monthCell';
-import type { MonthGrid } from '../../../../src/renderer/date/monthGrid';
-import type { HolidayMap } from '../../../../src/renderer/holidays/holidayDates';
-import type { EventsByDate } from '../../../../src/renderer/views/eventsByDate';
-import type { MonthViewHandlers } from '../../../../src/renderer/views/monthViewHandlers';
+} from '@renderer/constants';
+import { DRAG_EVENTS } from '@renderer/dragDrop/dragTransfer';
+import { groupSegmentsByDate } from '@renderer/events/eventGrouping';
+import { toEventKey } from '@renderer/events/eventKey';
+import { MonthView } from '@renderer/views/MonthView';
+import { createCalendarEvent } from '@tests/support/calendarEventFactory';
+import { createDragEvent, createPayloadTransfer, readTransferPayload } from '@tests/support/dragEvents';
+import type { MonthCell } from '@renderer/date/monthCell';
+import type { MonthGrid } from '@renderer/date/monthGrid';
+import type { HolidayMap } from '@renderer/holidays/holidayDates';
+import type { MonthViewHandlers } from '@renderer/views/monthViewHandlers';
 
 const OUTSIDE_ISO = '2026-08-31';
 const TODAY_ISO = '2026-09-01';
@@ -29,9 +30,15 @@ const YEAR = 2026;
 const HOLIDAY_NAMES = ['Feiertag A', 'Feiertag B'];
 const EMPTY_DATE = '';
 const NO_OFFSET = 0;
+const SECOND_DAY_OFFSET = 1;
+const KEEP_TIME = null;
 
-const LATE_EVENT = createCalendarEvent({ id: 'late', time: '15:00', endTime: '15:30' });
-const EARLY_EVENT = createCalendarEvent({ id: 'early', time: '08:00', endTime: '11:00' });
+const LATE_EVENT = createCalendarEvent({ id: 'late', date: TODAY_ISO, time: '15:00', endTime: '15:30' });
+const EARLY_EVENT = createCalendarEvent({ id: 'early', date: TODAY_ISO, time: '08:00', endTime: '11:00' });
+const TRIP_EVENT = createCalendarEvent({ id: 'trip', date: OUTSIDE_ISO, endDate: HOLIDAY_ISO, time: '08:00', endTime: '11:00' });
+const LATE_KEY = toEventKey(LATE_EVENT);
+const EARLY_KEY = toEventKey(EARLY_EVENT);
+const TRIP_KEY = toEventKey(TRIP_EVENT);
 const EARLY_EVENT_STEPS = 3;
 
 const DAY_SELECTOR = '.' + CSS_CLASSES.DAY;
@@ -64,16 +71,21 @@ describe('MonthView', () => {
     handlers = createHandlers();
     view = new MonthView(handlers);
     document.body.replaceChildren(view.element);
-    const eventsByDate: EventsByDate = new Map([[TODAY_ISO, [LATE_EVENT, EARLY_EVENT]]]);
+    const segmentsByDate = groupSegmentsByDate([LATE_EVENT, EARLY_EVENT, TRIP_EVENT]);
     const holidaysByDate: HolidayMap = new Map([[HOLIDAY_ISO, HOLIDAY_NAMES]]);
-    view.render(createGrid(WEEK_COUNT), eventsByDate, holidaysByDate);
+    view.render(createGrid(WEEK_COUNT), segmentsByDate, holidaysByDate);
     dayElements = [...view.element.querySelectorAll<HTMLElement>(DAY_SELECTOR)];
   });
 
-  function requirePill(eventId: string): HTMLButtonElement {
-    const pill = view.element.querySelector<HTMLButtonElement>(`${EVENT_SELECTOR}[data-event-id="${eventId}"]`);
-    if (!pill) throw new Error(eventId);
+  function requirePill(eventKey: string, dayElement: ParentNode = view.element): HTMLButtonElement {
+    const pill = dayElement.querySelector<HTMLButtonElement>(`${EVENT_SELECTOR}[data-event-key="${eventKey}"]`);
+    if (!pill) throw new Error(eventKey);
     return pill;
+  }
+
+  function dropOn(day: HTMLElement, eventKey: string, dayOffset: number): void {
+    const payload = { eventKey, dayOffset, offsetMinutes: KEEP_TIME };
+    day.dispatchEvent(createDragEvent(DRAG_EVENTS.DROP, { dataTransfer: createPayloadTransfer(payload) }));
   }
 
   it('renders the weekday labels', () => {
@@ -106,16 +118,25 @@ describe('MonthView', () => {
     expect(outsideDay.querySelector('.' + CSS_CLASSES.DAY_HOLIDAY_NAME)).toBeNull();
   });
 
-  it('renders events sorted by time', () => {
+  it('renders segments sorted by their start on that day', () => {
     const pills = [...dayElements[1].querySelectorAll<HTMLElement>(EVENT_SELECTOR)];
-    expect(pills.map((pill) => pill.dataset.eventId)).toEqual([EARLY_EVENT.id, LATE_EVENT.id]);
+    expect(pills.map((pill) => pill.dataset.eventKey)).toEqual([TRIP_KEY, EARLY_KEY, LATE_KEY]);
+  });
+
+  it('renders a pill for every day covered by a multi day event', () => {
+    expect(dayElements.map((day) => day.querySelectorAll(`[data-event-key="${TRIP_KEY}"]`).length)).toEqual([1, 1, 1]);
   });
 
   it('adds the duration class only from the minimum stretched duration on', () => {
     const hasDurationClass = (pill: HTMLElement) => [...pill.classList].some((name) => name.startsWith(EVENT_DURATION_CLASS_PREFIX));
     expect(EARLY_EVENT_STEPS).toBeGreaterThanOrEqual(MIN_STRETCHED_DURATION_STEPS);
-    expect(requirePill(EARLY_EVENT.id).classList.contains(EVENT_DURATION_CLASS_PREFIX + EARLY_EVENT_STEPS)).toBe(true);
-    expect(hasDurationClass(requirePill(LATE_EVENT.id))).toBe(false);
+    expect(requirePill(EARLY_KEY).classList.contains(EVENT_DURATION_CLASS_PREFIX + EARLY_EVENT_STEPS)).toBe(true);
+    expect(hasDurationClass(requirePill(LATE_KEY))).toBe(false);
+  });
+
+  it('never adds the duration class to segments of multi day events', () => {
+    const hasDurationClass = (pill: HTMLElement) => [...pill.classList].some((name) => name.startsWith(EVENT_DURATION_CLASS_PREFIX));
+    expect(hasDurationClass(requirePill(TRIP_KEY, dayElements[0]))).toBe(false);
   });
 
   it('replaces the previous week count class on re-render', () => {
@@ -128,13 +149,13 @@ describe('MonthView', () => {
   });
 
   it('activates an event when its pill is clicked', () => {
-    dispatchMouse(requirePill(EARLY_EVENT.id).firstElementChild as Element, 'click');
-    expect(handlers.onEventActivate).toHaveBeenCalledWith(EARLY_EVENT.id);
+    dispatchMouse(requirePill(EARLY_KEY).firstElementChild as Element, 'click');
+    expect(handlers.onEventActivate).toHaveBeenCalledWith(EARLY_KEY);
   });
 
-  it('activates with an empty id when the pill lost its event id', () => {
-    const pill = requirePill(EARLY_EVENT.id);
-    delete pill.dataset.eventId;
+  it('activates with an empty key when the pill lost its event key', () => {
+    const pill = requirePill(EARLY_KEY);
+    delete pill.dataset.eventKey;
     dispatchMouse(pill, 'click');
     expect(handlers.onEventActivate).toHaveBeenCalledWith(EMPTY_DATE);
   });
@@ -157,7 +178,7 @@ describe('MonthView', () => {
   });
 
   it('does not activate a day when double clicking an event pill', () => {
-    dispatchMouse(requirePill(EARLY_EVENT.id), 'dblclick');
+    dispatchMouse(requirePill(EARLY_KEY), 'dblclick');
     expect(handlers.onDayActivate).not.toHaveBeenCalled();
   });
 
@@ -167,24 +188,34 @@ describe('MonthView', () => {
   });
 
   it('moves a dropped event to the target day', () => {
-    const payload = { eventId: LATE_EVENT.id, offsetMinutes: NO_OFFSET };
-    dayElements[2].dispatchEvent(createDragEvent(DRAG_EVENTS.DROP, { dataTransfer: createPayloadTransfer(payload) }));
-    expect(handlers.onEventDrop).toHaveBeenCalledWith(LATE_EVENT.id, { date: HOLIDAY_ISO });
+    dropOn(dayElements[2], LATE_KEY, NO_OFFSET);
+    expect(handlers.onEventDrop).toHaveBeenCalledWith(LATE_KEY, { date: HOLIDAY_ISO });
+  });
+
+  it('moves a dropped multi day event so the grabbed day lands on the target day', () => {
+    dropOn(dayElements[2], TRIP_KEY, SECOND_DAY_OFFSET);
+    expect(handlers.onEventDrop).toHaveBeenCalledWith(TRIP_KEY, { date: TODAY_ISO });
   });
 
   it('moves a dropped event to an empty date when the day lost its date', () => {
     const day = dayElements[2];
-    const payload = { eventId: LATE_EVENT.id, offsetMinutes: NO_OFFSET };
     delete day.dataset.date;
-    day.dispatchEvent(createDragEvent(DRAG_EVENTS.DROP, { dataTransfer: createPayloadTransfer(payload) }));
-    expect(handlers.onEventDrop).toHaveBeenCalledWith(LATE_EVENT.id, { date: EMPTY_DATE });
+    dropOn(day, LATE_KEY, NO_OFFSET);
+    expect(handlers.onEventDrop).toHaveBeenCalledWith(LATE_KEY, { date: EMPTY_DATE });
   });
 
   it('starts dragging a pill without a time offset', () => {
-    const pill = requirePill(EARLY_EVENT.id);
+    const pill = requirePill(EARLY_KEY);
     const dataTransfer = new DataTransfer();
     pill.dispatchEvent(createDragEvent(DRAG_EVENTS.START, { dataTransfer }));
     expect(pill.draggable).toBe(true);
-    expect(readTransferPayload(dataTransfer)).toEqual({ eventId: EARLY_EVENT.id, offsetMinutes: NO_OFFSET });
+    expect(readTransferPayload(dataTransfer)).toEqual({ eventKey: EARLY_KEY, dayOffset: NO_OFFSET, offsetMinutes: KEEP_TIME });
+  });
+
+  it('starts dragging a multi day segment with its day offset', () => {
+    const pill = requirePill(TRIP_KEY, dayElements[1]);
+    const dataTransfer = new DataTransfer();
+    pill.dispatchEvent(createDragEvent(DRAG_EVENTS.START, { dataTransfer }));
+    expect(readTransferPayload(dataTransfer)).toEqual({ eventKey: TRIP_KEY, dayOffset: SECOND_DAY_OFFSET, offsetMinutes: KEEP_TIME });
   });
 });

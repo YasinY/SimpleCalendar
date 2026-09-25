@@ -1,8 +1,4 @@
-import type { Settings } from '../../shared/settings';
-
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+import type { Settings } from '@shared/settings';
 
 export function pickKnownKeys(source: Record<string, unknown>, knownKeys: string[]): Partial<Settings> {
   const picked: Record<string, unknown> = {};

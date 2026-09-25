@@ -13,14 +13,16 @@ import {
 } from './constants';
 import { ReminderScheduler } from './reminders/ReminderScheduler';
 import { openStorage } from './storage/openStorage';
-import { IPC_CHANNELS } from '../shared/ipcChannels';
+import { IPC_CHANNELS } from '@shared/ipcChannels';
 import type { CalendarStorage } from './storage/calendarStorage';
 import type { TrayManager } from './tray/TrayManager';
-import type { CalendarEvent } from '../shared/calendarEvent';
-import type { DateRange } from '../shared/dateRange';
-import type { EventInput } from '../shared/eventInput';
-import type { Settings } from '../shared/settings';
-import type { Theme } from '../shared/theme';
+import type { UpdateService } from './updates/UpdateService';
+import type { CalendarEvent } from '@shared/calendarEvent';
+import type { DateRange } from '@shared/dateRange';
+import type { EventInput } from '@shared/eventInput';
+import type { OccurrenceRef } from '@shared/occurrenceRef';
+import type { Settings } from '@shared/settings';
+import type { Theme } from '@shared/theme';
 
 const WINDOW_CONTROL_ACTIONS: Record<string, (window: BrowserWindow) => void> = {
   [IPC_CHANNELS.WINDOW_MINIMIZE]: (window) => window.minimize(),
@@ -30,14 +32,16 @@ const WINDOW_CONTROL_ACTIONS: Record<string, (window: BrowserWindow) => void> = 
 
 export class MainApplication {
   readonly #trayManager: TrayManager;
+  readonly #updateService: UpdateService;
   readonly #dateFormatter = new Intl.DateTimeFormat(APP_LOCALE, NOTIFICATION_DATE_FORMAT);
   #storage: CalendarStorage | null = null;
   #scheduler: ReminderScheduler | null = null;
   #mainWindow: BrowserWindow | null = null;
   #isQuitting = false;
 
-  constructor(trayManager: TrayManager) {
+  constructor(trayManager: TrayManager, updateService: UpdateService) {
     this.#trayManager = trayManager;
+    this.#updateService = updateService;
   }
 
   run(): void {
@@ -61,7 +65,8 @@ export class MainApplication {
     this.#storage = storage;
     this.#scheduler = new ReminderScheduler(storage.events, (event, eventDate) => this.#showNotification(event, eventDate));
 
-    this.#applyTheme(storage.settings.getAll().theme);
+    const settings = storage.settings.getAll();
+    this.#applyTheme(settings.theme);
     nativeTheme.on('updated', () => this.#mainWindow?.setBackgroundColor(this.#currentBackgroundColor()));
 
     this.#registerIpcHandlers(storage);
@@ -71,6 +76,7 @@ export class MainApplication {
     if (!this.#startsHidden()) this.#mainWindow.webContents.once('did-finish-load', () => this.#revealWindow());
 
     this.#scheduler.start();
+    if (settings.autoUpdate) this.#updateService.start();
   }
 
   #startsHidden(): boolean {
@@ -160,7 +166,9 @@ export class MainApplication {
   #registerIpcHandlers({ events, settings }: CalendarStorage): void {
     ipcMain.handle(IPC_CHANNELS.GET_EVENTS, (_event, range: DateRange) => events.getBetween(range));
     ipcMain.handle(IPC_CHANNELS.SAVE_EVENT, (_event, payload: EventInput) => events.save(payload));
+    ipcMain.handle(IPC_CHANNELS.SAVE_OCCURRENCE, (_event, payload: EventInput) => events.saveOccurrence(payload));
     ipcMain.handle(IPC_CHANNELS.DELETE_EVENT, (_event, id: string) => events.delete(id));
+    ipcMain.handle(IPC_CHANNELS.DELETE_OCCURRENCE, (_event, ref: OccurrenceRef) => events.deleteOccurrence(ref));
     ipcMain.handle(IPC_CHANNELS.GET_SETTINGS, () => settings.getAll());
     ipcMain.handle(IPC_CHANNELS.UPDATE_SETTINGS, (_event, patch: Partial<Settings>) => {
       const updated = settings.update(patch);

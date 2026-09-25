@@ -1,5 +1,5 @@
-import { WINDOW_CONTROL_IDS } from '../constants';
-import type { CalendarApi } from '../../shared/calendarApi';
+import { WINDOW_CONTROL_IDS } from '@renderer/constants';
+import type { CalendarApi } from '@shared/calendarApi';
 
 export function bindWindowControls(api: CalendarApi): void {
   const actions: Record<string, () => void> = {

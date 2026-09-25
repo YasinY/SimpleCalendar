@@ -10,7 +10,7 @@ import {
 import type { CurrentWeather } from './currentWeather';
 import type { ForecastResponse } from './forecastResponse';
 import type { GeocodingResponse } from './geocodingResponse';
-import type { WeatherLocation } from '../../shared/weatherLocation';
+import type { WeatherLocation } from '@shared/weatherLocation';
 
 const FIRST_RESULT = 0;
 

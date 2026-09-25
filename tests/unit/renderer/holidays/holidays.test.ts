@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { toIsoDate } from '../../../../src/renderer/date/dateUtils';
-import { buildHolidayMap, getEasterSunday, getRepentanceDay } from '../../../../src/renderer/holidays/holidayDates';
+import { toIsoDate } from '@renderer/date/dateUtils';
+import { buildHolidayMap, getEasterSunday, getRepentanceDay } from '@renderer/holidays/holidayDates';
 
 function findDate(map: Map<string, string[]>, name: string): string | undefined {
   for (const [iso, names] of map) {

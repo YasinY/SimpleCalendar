@@ -1,5 +1,5 @@
-import { ESCAPE_KEY, HIDDEN_ATTRIBUTE } from '../constants';
-import { requireElement } from '../dom/elements';
+import { ESCAPE_KEY, HIDDEN_ATTRIBUTE } from '@renderer/constants';
+import { requireElement } from '@renderer/dom/elements';
 import { captureFormState } from './formSnapshot';
 import type { DialogOverlayOptions } from './dialogOverlayOptions';
 import type { DiscardPrompt } from './DiscardPrompt';

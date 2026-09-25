@@ -1,4 +1,4 @@
-import { DRAG_SNAP_MINUTES, MINUTES_PER_DAY } from '../constants';
+import { DRAG_SNAP_MINUTES, MINUTES_PER_DAY } from '@renderer/constants';
 
 const LAST_SNAP_START = MINUTES_PER_DAY - DRAG_SNAP_MINUTES;
 const FIRST_MINUTE = 0;

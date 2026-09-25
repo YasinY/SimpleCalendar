@@ -4,6 +4,19 @@ const WINDOW_MINIMIZE_CHANNEL = 'window:minimize';
 const ACTIVATE_EVENT = 'activate';
 const THEME_UPDATED_EVENT = 'updated';
 const IS_PACKAGED_PROPERTY = 'isPackaged';
+const RECORDED_CONSOLE_METHODS = ['info', 'error'];
+const MESSAGE_PART_SEPARATOR = ' ';
+
+function recordConsoleMessages() {
+  globalThis.__e2eConsoleMessages = [];
+  for (const methodName of RECORDED_CONSOLE_METHODS) {
+    const original = console[methodName];
+    console[methodName] = (...parts) => {
+      globalThis.__e2eConsoleMessages.push(parts.map(String).join(MESSAGE_PART_SEPARATOR));
+      original.apply(console, parts);
+    };
+  }
+}
 
 function simulatePackagedAppWithRecordedAutostart(app) {
   globalThis.__e2eLoginItemSettings = [];
@@ -29,4 +42,7 @@ function installHooks() {
   exposeTrayAndEmitEventsBeforeWindowExists(electron);
 }
 
-if (process.type === BROWSER_PROCESS_TYPE) setImmediate(installHooks);
+if (process.type === BROWSER_PROCESS_TYPE) {
+  recordConsoleMessages();
+  setImmediate(installHooks);
+}

@@ -71,6 +71,31 @@
         <span class="checkbox__label">Ganztägig</span>
       </label>
 
+      <label class="field">
+        <span class="field__label">Enddatum (optional, für mehrtägige Termine)</span>
+        <input class="field__input" type="date" data-dialog-end-date>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Wiederholung</span>
+        <select class="field__input field__input--select" data-dialog-recurrence></select>
+      </label>
+
+      <div class="field-row" data-dialog-recurrence-details hidden>
+        <label class="field">
+          <span class="field__label">Alle</span>
+          <span class="field__inline">
+            <input class="field__input field__input--number" type="number" min="1" max="365" step="1" value="1" data-dialog-interval>
+            <span class="field__unit" data-dialog-interval-unit></span>
+          </span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Endet am (optional)</span>
+          <input class="field__input" type="date" data-dialog-until>
+        </label>
+      </div>
+
       <div class="field" role="radiogroup" aria-label="Farbe">
         <span class="field__label">Farbe</span>
         <div class="swatches" data-dialog-colors></div>
@@ -115,6 +140,14 @@
         <input class="field__input" type="text" data-settings-city maxlength="80" placeholder="z. B. Hamburg">
       </label>
 
+      <div class="field">
+        <label class="checkbox">
+          <input class="checkbox__input" type="checkbox" data-settings-auto-update>
+          <span class="checkbox__label">Updates beim Start automatisch installieren</span>
+        </label>
+        <p class="field__hint">Abschalten wird nicht empfohlen: Ohne automatische Updates bekommst du keine Fehlerbehebungen und neuen Funktionen.</p>
+      </div>
+
       <footer class="dialog__footer">
         <span class="dialog__spacer"></span>
         <button type="button" class="button" data-settings-cancel>Abbrechen</button>
@@ -131,6 +164,19 @@
         <span class="dialog__spacer"></span>
         <button type="button" class="button" data-discard-keep>Weiter bearbeiten</button>
         <button type="button" class="button button--danger" data-discard-confirm>Verwerfen</button>
+      </footer>
+    </div>
+  </div>
+
+  <div class="overlay overlay--prompt" id="scopeOverlay" hidden>
+    <div class="dialog dialog--prompt" role="alertdialog" aria-labelledby="scopeHeading" aria-describedby="scopeMessage">
+      <h2 class="dialog__heading" id="scopeHeading">Serientermin</h2>
+      <p class="dialog__message" id="scopeMessage">Soll die Änderung nur für diesen Termin oder für die ganze Serie gelten?</p>
+      <footer class="dialog__footer">
+        <button type="button" class="button" data-scope-cancel>Abbrechen</button>
+        <span class="dialog__spacer"></span>
+        <button type="button" class="button" data-scope-occurrence>Nur dieser Termin</button>
+        <button type="button" class="button button--primary" data-scope-series>Ganze Serie</button>
       </footer>
     </div>
   </div>

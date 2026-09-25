@@ -1,5 +1,5 @@
 import { requireElementById } from './elements';
-import type { CalendarElements } from '../calendarElements';
+import type { CalendarElements } from '@renderer/calendarElements';
 
 const ELEMENT_IDS = {
   MONTH_NAME: 'monthName',

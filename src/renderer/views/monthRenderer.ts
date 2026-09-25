@@ -1,8 +1,8 @@
-import type { MonthGrid } from '../date/monthGrid';
-import type { HolidayMap } from '../holidays/holidayDates';
-import type { EventsByDate } from './eventsByDate';
+import type { MonthGrid } from '@renderer/date/monthGrid';
+import type { HolidayMap } from '@renderer/holidays/holidayDates';
+import type { SegmentsByDate } from './segmentsByDate';
 
 export interface MonthRenderer {
   readonly element: HTMLElement;
-  render(grid: MonthGrid, eventsByDate: EventsByDate, holidaysByDate: HolidayMap): void;
+  render(grid: MonthGrid, segmentsByDate: SegmentsByDate, holidaysByDate: HolidayMap): void;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_EVENT_COLOR, EVENT_COLORS, resolveEventColor } from '../../../../src/renderer/events/eventColors';
+import { DEFAULT_EVENT_COLOR, EVENT_COLORS, resolveEventColor } from '@renderer/events/eventColors';
 
 const KNOWN_COLOR = EVENT_COLORS[2].id;
 const UNKNOWN_COLOR = 'magenta';

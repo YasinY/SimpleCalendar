@@ -1,27 +1,38 @@
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { createCalendarApp } from '../../../src/renderer/createCalendarApp';
-import { fetchCurrentWeather, geocodeCity } from '../../../src/renderer/weather/weatherApi';
-import { DEFAULT_SETTINGS } from '../../../src/shared/settingsDefaults';
-import type { CalendarApi } from '../../../src/shared/calendarApi';
-import type { CalendarEvent } from '../../../src/shared/calendarEvent';
-import type { Settings } from '../../../src/shared/settings';
-import type { WeatherLocation } from '../../../src/shared/weatherLocation';
-import { createCalendarEvent } from '../../support/calendarEventFactory';
-import { mountIndexDocument, requireById } from '../../support/indexDocument';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createCalendarApp } from '@renderer/createCalendarApp';
+import { toEventKey } from '@renderer/events/eventKey';
+import { fetchCurrentWeather, geocodeCity } from '@renderer/weather/weatherApi';
+import { DEFAULT_SETTINGS } from '@shared/settingsDefaults';
+import type { CalendarEvent } from '@shared/calendarEvent';
+import type { Recurrence } from '@shared/recurrence';
+import type { Settings } from '@shared/settings';
+import type { WeatherLocation } from '@shared/weatherLocation';
+import { createCalendarApiMock, type CalendarApiMock } from '@tests/support/calendarAppDoubles';
+import { createCalendarEvent } from '@tests/support/calendarEventFactory';
+import { mountIndexDocument, requireById } from '@tests/support/indexDocument';
 
-vi.mock('../../../src/renderer/weather/weatherApi', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../src/renderer/weather/weatherApi')>()),
+vi.mock('@renderer/weather/weatherApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@renderer/weather/weatherApi')>()),
   geocodeCity: vi.fn(),
   fetchCurrentWeather: vi.fn()
 }));
-
-type CalendarApiMock = { [Key in keyof CalendarApi]: Mock<CalendarApi[Key]> };
 
 const NOW = new Date(2026, 8, 16, 12, 0);
 const TODAY_ISO = '2026-09-16';
 const DROP_TARGET_ISO = '2026-09-20';
 const EVENT_ID = 'event-1';
-const UNKNOWN_EVENT_ID = 'missing';
+const UNKNOWN_EVENT_KEY = 'missing@2026-09-16';
+const SERIES_ID = 'series-1';
+const TRIP_ID = 'trip';
+const TRIP_END_ISO = '2026-09-18';
+const TRIP_MIDDLE_ISO = '2026-09-17';
+const WEEKLY_RECURRENCE: Recurrence = { frequency: 'weekly', interval: 1, until: null };
+const NO_DAY_OFFSET = 0;
+const SECOND_DAY_OFFSET = 1;
+const KEEP_TIME = null;
+const GRAB_OFFSET_MINUTES = 0;
+const TRIP_SHIFTED_START_ISO = '2026-09-19';
+const TRIP_SHIFTED_END_ISO = '2026-09-21';
 const EVENT_TITLE = 'Meeting';
 const WEATHER_CITY = 'Hamburg';
 const WEATHER_LOCATION: WeatherLocation = { city: WEATHER_CITY, name: WEATHER_CITY, latitude: 53.55, longitude: 9.99 };
@@ -45,14 +56,17 @@ const ELEMENT_IDS = {
   TODAY: 'todayButton',
   SETTINGS_BUTTON: 'settingsButton',
   DIALOG_OVERLAY: 'dialogOverlay',
-  SETTINGS_OVERLAY: 'settingsOverlay'
+  SETTINGS_OVERLAY: 'settingsOverlay',
+  SCOPE_OVERLAY: 'scopeOverlay'
 } as const;
 
 const SELECTORS = {
   MONTH_VIEW: '.month-view',
   TIME_GRID: '.time-grid',
   TIME_GRID_COLUMN: '.time-grid__column',
+  TIME_GRID_ALL_DAY_CELL: '.time-grid__all-day-cell',
   EVENT: '.event',
+  EVENT_BLOCK: '.event--block',
   SETTINGS_FORM: '[data-settings-form]',
   SETTINGS_CITY: '[data-settings-city]',
   DIALOG_FORM: '[data-dialog-form]',
@@ -60,7 +74,10 @@ const SELECTORS = {
   DIALOG_TIME: '[data-dialog-time]',
   DIALOG_DATE: '[data-dialog-date]',
   DIALOG_HEADING: '[data-dialog-heading]',
-  DIALOG_DELETE: '[data-dialog-delete]'
+  DIALOG_DELETE: '[data-dialog-delete]',
+  SCOPE_OCCURRENCE: '[data-scope-occurrence]',
+  SCOPE_SERIES: '[data-scope-series]',
+  SCOPE_CANCEL: '[data-scope-cancel]'
 } as const;
 
 const TITLES = {
@@ -83,18 +100,11 @@ const RANGES = {
 
 let api: CalendarApiMock;
 
-function createApi(settings: Settings, events: CalendarEvent[]): CalendarApiMock {
-  return {
-    getEvents: vi.fn<CalendarApi['getEvents']>(async () => events),
-    saveEvent: vi.fn<CalendarApi['saveEvent']>(async () => createCalendarEvent()),
-    deleteEvent: vi.fn<CalendarApi['deleteEvent']>(async () => true),
-    getSettings: vi.fn<CalendarApi['getSettings']>(async () => settings),
-    updateSettings: vi.fn<CalendarApi['updateSettings']>(async (patch) => ({ ...settings, ...patch })),
-    minimizeWindow: vi.fn<CalendarApi['minimizeWindow']>(),
-    toggleMaximizeWindow: vi.fn<CalendarApi['toggleMaximizeWindow']>(),
-    hideWindow: vi.fn<CalendarApi['hideWindow']>()
-  };
-}
+const STORED_EVENT = createCalendarEvent({ id: EVENT_ID, date: TODAY_ISO, title: EVENT_TITLE });
+const RECURRING_EVENT = createCalendarEvent({ id: SERIES_ID, date: TODAY_ISO, title: EVENT_TITLE, recurrence: WEEKLY_RECURRENCE });
+const TRIP_EVENT = createCalendarEvent({ id: TRIP_ID, date: TODAY_ISO, endDate: TRIP_END_ISO, allDay: true, title: EVENT_TITLE });
+const EVENT_KEY = toEventKey(STORED_EVENT);
+const TRIP_KEY = toEventKey(TRIP_EVENT);
 
 async function flushPromises(): Promise<void> {
   for (let round = 0; round < FLUSH_ROUNDS; round += 1) {
@@ -103,7 +113,7 @@ async function flushPromises(): Promise<void> {
 }
 
 async function startApp(settingsOverrides: Partial<Settings> = {}, events: CalendarEvent[] = []): Promise<void> {
-  api = createApi({ ...DEFAULT_SETTINGS, ...settingsOverrides }, events);
+  api = createCalendarApiMock({ ...DEFAULT_SETTINGS, ...settingsOverrides }, events);
   await createCalendarApp(api).start();
   await flushPromises();
 }
@@ -132,9 +142,9 @@ async function submit(form: HTMLFormElement): Promise<void> {
   await flushPromises();
 }
 
-async function dropOn(zone: HTMLElement, eventId: string, clientY = 0): Promise<void> {
+async function dropOn(zone: HTMLElement, eventKey: string, dayOffset = NO_DAY_OFFSET, offsetMinutes: number | null = GRAB_OFFSET_MINUTES, clientY = 0): Promise<void> {
   const dataTransfer = new DataTransfer();
-  dataTransfer.setData(DRAG_DATA_TYPE, JSON.stringify({ eventId, offsetMinutes: 0 }));
+  dataTransfer.setData(DRAG_DATA_TYPE, JSON.stringify({ eventKey, dayOffset, offsetMinutes }));
   const dropEvent = new DragEvent('drop', { bubbles: true, cancelable: true, clientY, dataTransfer });
   Object.defineProperties(dropEvent, { dataTransfer: { value: dataTransfer }, clientY: { value: clientY } });
   zone.dispatchEvent(dropEvent);
@@ -145,6 +155,14 @@ function timeGridColumn(isoDate: string): HTMLElement {
   const column = query(`${SELECTORS.TIME_GRID_COLUMN}[data-date="${isoDate}"]`);
   vi.spyOn(column, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 0, COLUMN_HEIGHT));
   return column;
+}
+
+function pillsOf(eventKey: string): HTMLElement[] {
+  return [...document.querySelectorAll<HTMLElement>(`${SELECTORS.EVENT}[data-event-key="${eventKey}"]`)];
+}
+
+async function chooseScope(selector: string): Promise<void> {
+  await click(query(`#${ELEMENT_IDS.SCOPE_OVERLAY} ${selector}`));
 }
 
 function titleText(): { main: string | null; year: string | null } {
@@ -335,7 +353,7 @@ describe('CalendarApp', () => {
     });
 
     it('opens an existing event for editing and deletes it', async () => {
-      await startApp({}, [createCalendarEvent({ id: EVENT_ID, date: TODAY_ISO, title: EVENT_TITLE })]);
+      await startApp({}, [STORED_EVENT]);
       await click(query(SELECTORS.EVENT));
       expect(isHidden(ELEMENT_IDS.DIALOG_OVERLAY)).toBe(false);
       expect(query(SELECTORS.DIALOG_HEADING).textContent).toBe(TITLES.EDIT_DIALOG);
@@ -343,42 +361,125 @@ describe('CalendarApp', () => {
 
       await click(query(SELECTORS.DIALOG_DELETE));
       expect(api.deleteEvent).toHaveBeenCalledWith(EVENT_ID);
+      expect(isHidden(ELEMENT_IDS.SCOPE_OVERLAY)).toBe(true);
       expect(isHidden(ELEMENT_IDS.DIALOG_OVERLAY)).toBe(true);
       expect(api.getEvents).toHaveBeenCalledTimes(2);
     });
 
     it('opens an existing event from the week view', async () => {
-      await startApp({ viewMode: VIEW_MODES.WEEK }, [createCalendarEvent({ id: EVENT_ID, date: TODAY_ISO, title: EVENT_TITLE })]);
-      await click(query(SELECTORS.EVENT));
+      await startApp({ viewMode: VIEW_MODES.WEEK }, [STORED_EVENT]);
+      await click(query(SELECTORS.EVENT_BLOCK));
       expect(query(SELECTORS.DIALOG_HEADING).textContent).toBe(TITLES.EDIT_DIALOG);
     });
 
+    it('opens an all day event from the all day row of the week view', async () => {
+      await startApp({ viewMode: VIEW_MODES.WEEK }, [TRIP_EVENT]);
+      await click(query(`${SELECTORS.TIME_GRID_ALL_DAY_CELL} ${SELECTORS.EVENT}`));
+      expect(query(SELECTORS.DIALOG_HEADING).textContent).toBe(TITLES.EDIT_DIALOG);
+    });
+
+    it('saves only the edited occurrence of a series when chosen', async () => {
+      await startApp({}, [RECURRING_EVENT]);
+      await click(query(SELECTORS.EVENT));
+      await submit(query(SELECTORS.DIALOG_FORM));
+      expect(isHidden(ELEMENT_IDS.SCOPE_OVERLAY)).toBe(false);
+
+      await chooseScope(SELECTORS.SCOPE_OCCURRENCE);
+      expect(api.saveOccurrence).toHaveBeenCalledWith(expect.objectContaining({ id: SERIES_ID, occurrenceDate: TODAY_ISO }));
+      expect(api.saveEvent).not.toHaveBeenCalled();
+      expect(isHidden(ELEMENT_IDS.SCOPE_OVERLAY)).toBe(true);
+      expect(isHidden(ELEMENT_IDS.DIALOG_OVERLAY)).toBe(true);
+    });
+
+    it('saves the whole series when chosen', async () => {
+      await startApp({}, [RECURRING_EVENT]);
+      await click(query(SELECTORS.EVENT));
+      await submit(query(SELECTORS.DIALOG_FORM));
+      await chooseScope(SELECTORS.SCOPE_SERIES);
+      expect(api.saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: SERIES_ID, recurrence: WEEKLY_RECURRENCE }));
+      expect(api.saveOccurrence).not.toHaveBeenCalled();
+    });
+
+    it('keeps the dialog open when the scope prompt is cancelled', async () => {
+      await startApp({}, [RECURRING_EVENT]);
+      await click(query(SELECTORS.EVENT));
+      await submit(query(SELECTORS.DIALOG_FORM));
+      await chooseScope(SELECTORS.SCOPE_CANCEL);
+      expect(api.saveEvent).not.toHaveBeenCalled();
+      expect(api.saveOccurrence).not.toHaveBeenCalled();
+      expect(isHidden(ELEMENT_IDS.DIALOG_OVERLAY)).toBe(false);
+      expect(api.getEvents).toHaveBeenCalledOnce();
+    });
+
+    it('deletes only the chosen occurrence of a series', async () => {
+      await startApp({}, [RECURRING_EVENT]);
+      await click(query(SELECTORS.EVENT));
+      await click(query(SELECTORS.DIALOG_DELETE));
+      await chooseScope(SELECTORS.SCOPE_OCCURRENCE);
+      expect(api.deleteOccurrence).toHaveBeenCalledWith({ id: SERIES_ID, occurrenceDate: TODAY_ISO });
+      expect(api.deleteEvent).not.toHaveBeenCalled();
+      expect(isHidden(ELEMENT_IDS.DIALOG_OVERLAY)).toBe(true);
+    });
+
     it('ignores clicks on events that are not loaded', async () => {
-      await startApp({}, [createCalendarEvent({ id: EVENT_ID, date: TODAY_ISO })]);
+      await startApp({}, [STORED_EVENT]);
       const pill = query(SELECTORS.EVENT);
-      pill.dataset.eventId = UNKNOWN_EVENT_ID;
+      pill.dataset.eventKey = UNKNOWN_EVENT_KEY;
       await click(pill);
       expect(isHidden(ELEMENT_IDS.DIALOG_OVERLAY)).toBe(true);
     });
   });
 
+  describe('multi day events', () => {
+    it('renders a pill on every covered day of the month view', async () => {
+      await startApp({}, [TRIP_EVENT]);
+      expect(pillsOf(TRIP_KEY).map((pill) => pill.closest<HTMLElement>('.day')?.dataset.date)).toEqual([TODAY_ISO, TRIP_MIDDLE_ISO, TRIP_END_ISO]);
+    });
+
+    it('renders all day events in the all day row of the week view', async () => {
+      await startApp({ viewMode: VIEW_MODES.WEEK }, [TRIP_EVENT]);
+      const cellDates = pillsOf(TRIP_KEY).map((pill) => pill.closest<HTMLElement>(SELECTORS.TIME_GRID_ALL_DAY_CELL)?.dataset.date);
+      expect(cellDates).toEqual([TODAY_ISO, TRIP_MIDDLE_ISO, TRIP_END_ISO]);
+    });
+  });
+
   describe('drag and drop', () => {
     it('moves a dropped event to the target day', async () => {
-      await startApp({}, [createCalendarEvent({ id: EVENT_ID, date: TODAY_ISO })]);
-      await dropOn(dayCell(DROP_TARGET_ISO), EVENT_ID);
-      expect(api.saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: EVENT_ID, date: DROP_TARGET_ISO }));
+      await startApp({}, [STORED_EVENT]);
+      await dropOn(dayCell(DROP_TARGET_ISO), EVENT_KEY, NO_DAY_OFFSET, KEEP_TIME);
+      expect(api.saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: EVENT_ID, occurrenceDate: TODAY_ISO, date: DROP_TARGET_ISO }));
       expect(api.getEvents).toHaveBeenCalledTimes(2);
     });
 
+    it('moves a multi day event dropped by a later day so that day lands on the target', async () => {
+      await startApp({}, [TRIP_EVENT]);
+      await dropOn(dayCell(DROP_TARGET_ISO), TRIP_KEY, SECOND_DAY_OFFSET, KEEP_TIME);
+      expect(api.saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: TRIP_ID, date: TRIP_SHIFTED_START_ISO, endDate: TRIP_SHIFTED_END_ISO }));
+    });
+
     it('moves a dropped event to the target slot in the week view', async () => {
-      await startApp({ viewMode: VIEW_MODES.WEEK }, [createCalendarEvent({ id: EVENT_ID, date: TODAY_ISO })]);
-      await dropOn(timeGridColumn(DROP_TARGET_ISO), EVENT_ID, SLOT_POINTER_Y);
+      await startApp({ viewMode: VIEW_MODES.WEEK }, [STORED_EVENT]);
+      await dropOn(timeGridColumn(DROP_TARGET_ISO), EVENT_KEY, NO_DAY_OFFSET, GRAB_OFFSET_MINUTES, SLOT_POINTER_Y);
       expect(api.saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: EVENT_ID, date: DROP_TARGET_ISO, time: SLOT_TIME }));
     });
 
+    it('moves an event dropped on the all day row of the week view to that date only', async () => {
+      await startApp({ viewMode: VIEW_MODES.WEEK }, [STORED_EVENT]);
+      await dropOn(query(`${SELECTORS.TIME_GRID_ALL_DAY_CELL}[data-date="${DROP_TARGET_ISO}"]`), EVENT_KEY, NO_DAY_OFFSET, KEEP_TIME);
+      expect(api.saveEvent).toHaveBeenCalledWith(expect.objectContaining({ id: EVENT_ID, date: DROP_TARGET_ISO, time: STORED_EVENT.time }));
+    });
+
+    it('moves only the dropped occurrence of a series when chosen', async () => {
+      await startApp({}, [RECURRING_EVENT]);
+      await dropOn(dayCell(DROP_TARGET_ISO), toEventKey(RECURRING_EVENT), NO_DAY_OFFSET, KEEP_TIME);
+      await chooseScope(SELECTORS.SCOPE_OCCURRENCE);
+      expect(api.saveOccurrence).toHaveBeenCalledWith(expect.objectContaining({ id: SERIES_ID, occurrenceDate: TODAY_ISO, date: DROP_TARGET_ISO }));
+      expect(api.getEvents).toHaveBeenCalledTimes(2);
+    });
+
     it('ignores drops of unknown events', async () => {
-      await startApp({}, [createCalendarEvent({ id: EVENT_ID, date: TODAY_ISO })]);
-      await dropOn(dayCell(DROP_TARGET_ISO), UNKNOWN_EVENT_ID);
+      await startApp({}, [STORED_EVENT]);
+      await dropOn(dayCell(DROP_TARGET_ISO), UNKNOWN_EVENT_KEY);
       expect(api.saveEvent).not.toHaveBeenCalled();
     });
   });

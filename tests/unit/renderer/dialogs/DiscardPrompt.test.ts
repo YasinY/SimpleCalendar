@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { DiscardPrompt } from '../../../../src/renderer/dialogs/DiscardPrompt';
-import { ESCAPE_KEY, HIDDEN_ATTRIBUTE } from '../../../../src/renderer/constants';
-import { mountIndexDocument, requireById } from '../../../support/indexDocument';
+import { DiscardPrompt } from '@renderer/dialogs/DiscardPrompt';
+import { ESCAPE_KEY, HIDDEN_ATTRIBUTE } from '@renderer/constants';
+import { mountIndexDocument, requireById } from '@tests/support/indexDocument';
 
 const OVERLAY_ID = 'discardOverlay';
 const KEEP_SELECTOR = '[data-discard-keep]';

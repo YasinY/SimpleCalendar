@@ -1,5 +1,5 @@
 import { Menu, Tray, nativeImage } from 'electron';
-import { TRAY_ICON_PATH, TRAY_LABELS, TRAY_TOOLTIP } from '../constants';
+import { TRAY_ICON_PATH, TRAY_LABELS, TRAY_TOOLTIP } from '@main/constants';
 import type { TrayHandlers } from './trayHandlers';
 
 export class TrayManager {

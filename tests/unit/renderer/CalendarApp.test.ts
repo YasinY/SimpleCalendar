@@ -1,23 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CalendarApp } from '../../../src/renderer/CalendarApp';
-import { moveEventTo } from '../../../src/renderer/events/eventMove';
-import { DEFAULT_SETTINGS } from '../../../src/shared/settingsDefaults';
-import type { CalendarElements } from '../../../src/renderer/calendarElements';
-import type { DayColumnLayout } from '../../../src/renderer/date/dayColumnLayout';
-import type { SettingsPatch } from '../../../src/renderer/dialogs/settingsPatch';
-import type { MoveTarget } from '../../../src/renderer/views/moveTarget';
-import type { CalendarEvent } from '../../../src/shared/calendarEvent';
-import type { EventInput } from '../../../src/shared/eventInput';
-import type { Settings } from '../../../src/shared/settings';
-import type { WeatherLocation } from '../../../src/shared/weatherLocation';
+import { CalendarApp } from '@renderer/CalendarApp';
+import { SERIES_SCOPES } from '@renderer/constants';
+import { groupSegmentsByDate } from '@renderer/events/eventGrouping';
+import { toEventKey } from '@renderer/events/eventKey';
+import { moveEventTo } from '@renderer/events/eventMove';
+import { DEFAULT_SETTINGS } from '@shared/settingsDefaults';
+import type { CalendarElements } from '@renderer/calendarElements';
+import type { DayColumnLayout } from '@renderer/date/dayColumnLayout';
+import type { SettingsPatch } from '@renderer/dialogs/settingsPatch';
+import type { MoveTarget } from '@renderer/views/moveTarget';
+import type { CalendarEvent } from '@shared/calendarEvent';
+import type { EventInput } from '@shared/eventInput';
+import type { Recurrence } from '@shared/recurrence';
+import type { SeriesScope } from '@shared/seriesScope';
+import type { Settings } from '@shared/settings';
+import type { WeatherLocation } from '@shared/weatherLocation';
 import {
   createCalendarApiMock,
   createCalendarAppDoubles,
   createCalendarElements,
   type CalendarApiMock,
   type CalendarAppDoubles
-} from '../../support/calendarAppDoubles';
-import { createCalendarEvent } from '../../support/calendarEventFactory';
+} from '@tests/support/calendarAppDoubles';
+import { createCalendarEvent } from '@tests/support/calendarEventFactory';
 
 const NOW = new Date(2026, 8, 16, 12, 0);
 const YEAR = 2026;
@@ -25,7 +30,11 @@ const TODAY_ISO = '2026-09-16';
 const WEEK_START_ISO = '2026-09-14';
 const DROP_TARGET_ISO = '2026-09-20';
 const EVENT_ID = 'event-1';
-const UNKNOWN_EVENT_ID = 'missing';
+const UNKNOWN_EVENT_KEY = 'missing@2026-09-16';
+const SERIES_ID = 'series-1';
+const SERIES_OCCURRENCE_ISO = '2026-09-17';
+const CANCELLED_SCOPE = null;
+const WEEKLY_RECURRENCE: Recurrence = { frequency: 'weekly', interval: 1, until: null };
 const EVENT_TITLE = 'Meeting';
 const EMPTY_TITLE = '';
 const SLOT_TIME = '10:00';
@@ -60,7 +69,15 @@ const RANGES = {
 } as const;
 
 const STORED_EVENT = createCalendarEvent({ id: EVENT_ID, date: TODAY_ISO, title: EVENT_TITLE });
-const SETTINGS_PATCH: SettingsPatch = { holidayRegion: DEFAULT_SETTINGS.holidayRegion, theme: DEFAULT_SETTINGS.theme, weatherCity: WEATHER_CITY };
+const RECURRING_EVENT = createCalendarEvent({ id: SERIES_ID, date: SERIES_OCCURRENCE_ISO, title: EVENT_TITLE, recurrence: WEEKLY_RECURRENCE });
+const EVENT_KEY = toEventKey(STORED_EVENT);
+const RECURRING_EVENT_KEY = toEventKey(RECURRING_EVENT);
+const SETTINGS_PATCH: SettingsPatch = {
+  holidayRegion: DEFAULT_SETTINGS.holidayRegion,
+  theme: DEFAULT_SETTINGS.theme,
+  weatherCity: WEATHER_CITY,
+  autoUpdate: DEFAULT_SETTINGS.autoUpdate
+};
 const NEW_EVENT_INPUT: EventInput = { date: TODAY_ISO, time: SLOT_TIME, title: EVENT_TITLE };
 
 let api: CalendarApiMock;
@@ -111,6 +128,10 @@ function columnDates(): string[] | undefined {
   return lastTimeGridLayout()?.columns.map((column) => column.iso);
 }
 
+function chooseScopeOnce(scope: SeriesScope | null): void {
+  doubles.scopePrompt.choose.mockResolvedValueOnce(scope);
+}
+
 describe('CalendarApp', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -139,10 +160,10 @@ describe('CalendarApp', () => {
       expect(lastRequestedRange()).toEqual(RANGES.SEPTEMBER_GRID);
       expect(doubles.monthView.render).toHaveBeenCalledOnce();
       expect(doubles.timeGridView.render).not.toHaveBeenCalled();
-      const [grid, eventsByDate, holidaysByDate] = doubles.monthView.render.mock.calls[0];
+      const [grid, segmentsByDate, holidaysByDate] = doubles.monthView.render.mock.calls[0];
       expect(grid.years).toEqual([YEAR]);
       expect(grid.cells[0].iso).toBe(RANGES.SEPTEMBER_GRID.from);
-      expect(eventsByDate).toEqual(new Map([[TODAY_ISO, [STORED_EVENT]]]));
+      expect(segmentsByDate).toEqual(groupSegmentsByDate([STORED_EVENT]));
       expect(holidaysByDate.has(NATIONAL_HOLIDAY_ISO)).toBe(true);
     });
 
@@ -181,9 +202,9 @@ describe('CalendarApp', () => {
 
     it('passes grouped events and holidays to the time grid', async () => {
       await startApp({ viewMode: VIEW_MODES.WEEK });
-      const [layout, eventsByDate, holidaysByDate] = doubles.timeGridView.render.mock.calls[0];
+      const [layout, segmentsByDate, holidaysByDate] = doubles.timeGridView.render.mock.calls[0];
       expect(layout.years).toEqual([YEAR]);
-      expect(eventsByDate).toEqual(new Map([[TODAY_ISO, [STORED_EVENT]]]));
+      expect(segmentsByDate).toEqual(groupSegmentsByDate([STORED_EVENT]));
       expect(holidaysByDate.size).toBeGreaterThan(0);
     });
   });
@@ -277,36 +298,65 @@ describe('CalendarApp', () => {
 
     it('opens a known event from the month view', async () => {
       await startApp();
-      doubles.monthHandlers().onEventActivate(EVENT_ID);
+      doubles.monthHandlers().onEventActivate(EVENT_KEY);
       expect(doubles.eventDialog.openForEvent).toHaveBeenCalledExactlyOnceWith(STORED_EVENT);
+    });
+
+    it('opens the activated occurrence of a series by its key', async () => {
+      await startApp({}, [STORED_EVENT, RECURRING_EVENT]);
+      doubles.monthHandlers().onEventActivate(RECURRING_EVENT_KEY);
+      expect(doubles.eventDialog.openForEvent).toHaveBeenCalledExactlyOnceWith(RECURRING_EVENT);
     });
 
     it('opens a known event from the time grid', async () => {
       await startApp({ viewMode: VIEW_MODES.WEEK });
-      doubles.timeGridHandlers().onEventActivate(EVENT_ID);
+      doubles.timeGridHandlers().onEventActivate(EVENT_KEY);
       expect(doubles.eventDialog.openForEvent).toHaveBeenCalledExactlyOnceWith(STORED_EVENT);
     });
 
     it('ignores the activation of an unknown event', async () => {
       await startApp();
-      doubles.monthHandlers().onEventActivate(UNKNOWN_EVENT_ID);
+      doubles.monthHandlers().onEventActivate(UNKNOWN_EVENT_KEY);
       expect(doubles.eventDialog.openForEvent).not.toHaveBeenCalled();
     });
 
     it('saves an event dropped on a day and reloads', async () => {
       await startApp();
       const target: MoveTarget = { date: DROP_TARGET_ISO };
-      doubles.monthHandlers().onEventDrop(EVENT_ID, target);
+      doubles.monthHandlers().onEventDrop(EVENT_KEY, target);
       await flushPromises();
+      expect(doubles.scopePrompt.choose).not.toHaveBeenCalled();
       expect(api.saveEvent).toHaveBeenCalledExactlyOnceWith(moveEventTo(STORED_EVENT, target));
       expect(api.getEvents).toHaveBeenCalledTimes(2);
       expect(doubles.monthView.render).toHaveBeenCalledTimes(2);
     });
 
+    it('saves only the dropped occurrence of a series when chosen', async () => {
+      await startApp({}, [RECURRING_EVENT]);
+      const target: MoveTarget = { date: DROP_TARGET_ISO };
+      chooseScopeOnce(SERIES_SCOPES.OCCURRENCE);
+      doubles.monthHandlers().onEventDrop(RECURRING_EVENT_KEY, target);
+      await flushPromises();
+      expect(doubles.scopePrompt.choose).toHaveBeenCalledOnce();
+      expect(api.saveOccurrence).toHaveBeenCalledExactlyOnceWith(moveEventTo(RECURRING_EVENT, target));
+      expect(api.saveEvent).not.toHaveBeenCalled();
+      expect(api.getEvents).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not move a dropped occurrence when the scope prompt is cancelled', async () => {
+      await startApp({}, [RECURRING_EVENT]);
+      chooseScopeOnce(CANCELLED_SCOPE);
+      doubles.monthHandlers().onEventDrop(RECURRING_EVENT_KEY, { date: DROP_TARGET_ISO });
+      await flushPromises();
+      expect(api.saveOccurrence).not.toHaveBeenCalled();
+      expect(api.saveEvent).not.toHaveBeenCalled();
+      expect(api.getEvents).toHaveBeenCalledOnce();
+    });
+
     it('saves an event dropped on a time slot and reloads', async () => {
       await startApp({ viewMode: VIEW_MODES.WEEK });
       const target: MoveTarget = { date: DROP_TARGET_ISO, startMinutes: SLOT_START_MINUTES };
-      doubles.timeGridHandlers().onEventDrop(EVENT_ID, target);
+      doubles.timeGridHandlers().onEventDrop(EVENT_KEY, target);
       await flushPromises();
       expect(api.saveEvent).toHaveBeenCalledExactlyOnceWith(moveEventTo(STORED_EVENT, target));
       expect(api.getEvents).toHaveBeenCalledTimes(2);
@@ -314,7 +364,7 @@ describe('CalendarApp', () => {
 
     it('ignores drops of unknown events', async () => {
       await startApp();
-      doubles.monthHandlers().onEventDrop(UNKNOWN_EVENT_ID, { date: DROP_TARGET_ISO });
+      doubles.monthHandlers().onEventDrop(UNKNOWN_EVENT_KEY, { date: DROP_TARGET_ISO });
       await flushPromises();
       expect(api.saveEvent).not.toHaveBeenCalled();
       expect(api.getEvents).toHaveBeenCalledOnce();
@@ -324,7 +374,7 @@ describe('CalendarApp', () => {
   describe('event dialog handlers', () => {
     it('does not save an event without title', async () => {
       await startApp();
-      doubles.eventDialogHandlers().onSubmit({ ...NEW_EVENT_INPUT, title: EMPTY_TITLE });
+      doubles.eventDialogHandlers().onSubmit({ ...NEW_EVENT_INPUT, title: EMPTY_TITLE }, null);
       await flushPromises();
       expect(api.saveEvent).not.toHaveBeenCalled();
       expect(doubles.eventDialog.close).not.toHaveBeenCalled();
@@ -332,20 +382,93 @@ describe('CalendarApp', () => {
 
     it('saves an event with title, closes the dialog and reloads', async () => {
       await startApp();
-      doubles.eventDialogHandlers().onSubmit(NEW_EVENT_INPUT);
+      doubles.eventDialogHandlers().onSubmit(NEW_EVENT_INPUT, null);
       await flushPromises();
+      expect(doubles.scopePrompt.choose).not.toHaveBeenCalled();
       expect(api.saveEvent).toHaveBeenCalledExactlyOnceWith(NEW_EVENT_INPUT);
       expect(doubles.eventDialog.close).toHaveBeenCalledOnce();
       expect(api.getEvents).toHaveBeenCalledTimes(2);
     });
 
+    it('saves an edited single event without asking for a scope', async () => {
+      await startApp();
+      doubles.eventDialogHandlers().onSubmit(NEW_EVENT_INPUT, STORED_EVENT);
+      await flushPromises();
+      expect(doubles.scopePrompt.choose).not.toHaveBeenCalled();
+      expect(api.saveEvent).toHaveBeenCalledExactlyOnceWith(NEW_EVENT_INPUT);
+    });
+
+    it('saves the whole series when the series scope is chosen', async () => {
+      await startApp({}, [RECURRING_EVENT]);
+      doubles.eventDialogHandlers().onSubmit(NEW_EVENT_INPUT, RECURRING_EVENT);
+      await flushPromises();
+      expect(doubles.scopePrompt.choose).toHaveBeenCalledOnce();
+      expect(api.saveEvent).toHaveBeenCalledExactlyOnceWith(NEW_EVENT_INPUT);
+      expect(api.saveOccurrence).not.toHaveBeenCalled();
+      expect(doubles.eventDialog.close).toHaveBeenCalledOnce();
+    });
+
+    it('saves only the occurrence when the occurrence scope is chosen', async () => {
+      await startApp({}, [RECURRING_EVENT]);
+      chooseScopeOnce(SERIES_SCOPES.OCCURRENCE);
+      doubles.eventDialogHandlers().onSubmit(NEW_EVENT_INPUT, RECURRING_EVENT);
+      await flushPromises();
+      expect(api.saveOccurrence).toHaveBeenCalledExactlyOnceWith(NEW_EVENT_INPUT);
+      expect(api.saveEvent).not.toHaveBeenCalled();
+      expect(doubles.eventDialog.close).toHaveBeenCalledOnce();
+      expect(api.getEvents).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps the dialog open without saving when the scope prompt is cancelled', async () => {
+      await startApp({}, [RECURRING_EVENT]);
+      chooseScopeOnce(CANCELLED_SCOPE);
+      doubles.eventDialogHandlers().onSubmit(NEW_EVENT_INPUT, RECURRING_EVENT);
+      await flushPromises();
+      expect(api.saveEvent).not.toHaveBeenCalled();
+      expect(api.saveOccurrence).not.toHaveBeenCalled();
+      expect(doubles.eventDialog.close).not.toHaveBeenCalled();
+      expect(api.getEvents).toHaveBeenCalledOnce();
+    });
+
     it('deletes an event, closes the dialog and reloads', async () => {
       await startApp();
-      doubles.eventDialogHandlers().onDelete(EVENT_ID);
+      doubles.eventDialogHandlers().onDelete(STORED_EVENT);
       await flushPromises();
+      expect(doubles.scopePrompt.choose).not.toHaveBeenCalled();
       expect(api.deleteEvent).toHaveBeenCalledExactlyOnceWith(EVENT_ID);
       expect(doubles.eventDialog.close).toHaveBeenCalledOnce();
       expect(api.getEvents).toHaveBeenCalledTimes(2);
+    });
+
+    it('deletes the whole series when the series scope is chosen', async () => {
+      await startApp({}, [RECURRING_EVENT]);
+      doubles.eventDialogHandlers().onDelete(RECURRING_EVENT);
+      await flushPromises();
+      expect(doubles.scopePrompt.choose).toHaveBeenCalledOnce();
+      expect(api.deleteEvent).toHaveBeenCalledExactlyOnceWith(SERIES_ID);
+      expect(api.deleteOccurrence).not.toHaveBeenCalled();
+    });
+
+    it('deletes only the occurrence when the occurrence scope is chosen', async () => {
+      await startApp({}, [RECURRING_EVENT]);
+      chooseScopeOnce(SERIES_SCOPES.OCCURRENCE);
+      doubles.eventDialogHandlers().onDelete(RECURRING_EVENT);
+      await flushPromises();
+      expect(api.deleteOccurrence).toHaveBeenCalledExactlyOnceWith({ id: SERIES_ID, occurrenceDate: SERIES_OCCURRENCE_ISO });
+      expect(api.deleteEvent).not.toHaveBeenCalled();
+      expect(doubles.eventDialog.close).toHaveBeenCalledOnce();
+      expect(api.getEvents).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps the dialog open without deleting when the scope prompt is cancelled', async () => {
+      await startApp({}, [RECURRING_EVENT]);
+      chooseScopeOnce(CANCELLED_SCOPE);
+      doubles.eventDialogHandlers().onDelete(RECURRING_EVENT);
+      await flushPromises();
+      expect(api.deleteEvent).not.toHaveBeenCalled();
+      expect(api.deleteOccurrence).not.toHaveBeenCalled();
+      expect(doubles.eventDialog.close).not.toHaveBeenCalled();
+      expect(api.getEvents).toHaveBeenCalledOnce();
     });
   });
 

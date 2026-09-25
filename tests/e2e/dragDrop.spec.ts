@@ -2,15 +2,18 @@ import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './support/calendarFixture';
 import {
   DROP_TARGET_CLASS,
+  EVENT_CLASSES,
   SELECTORS,
   TODAY_ISO,
   VIEW_BUTTONS,
+  allDayCell,
   centerOf,
   collectPageErrors,
   dayCell,
   dragWithMouse,
   fetchEventByTitle,
   fetchEvents,
+  fetchEventsBetween,
   freezeClock,
   pointAtMinutes,
   removeAttribute,
@@ -32,8 +35,22 @@ const MORNING_MINUTES = 9 * 60;
 const LATE_MORNING_MINUTES = 11 * 60;
 const EARLY_AFTERNOON_MINUTES = 13 * 60;
 const NIGHT_MINUTES = 3 * 60;
+const EVENING_MINUTES = 21 * 60;
+const LATE_EVENING_MINUTES = 23 * 60;
 const INVALID_PAYLOAD = 'kein json';
-const UNKNOWN_PAYLOAD = JSON.stringify({ eventId: 'unknown-event', offsetMinutes: 0 });
+const UNKNOWN_PAYLOAD = JSON.stringify({ eventKey: 'unknown-event@' + TODAY_ISO, dayOffset: 0, offsetMinutes: 0 });
+const SEPTEMBER = { from: '2026-09-01', to: '2026-09-30' };
+
+const DATES = {
+  MONDAY: '2026-09-14',
+  TUESDAY: '2026-09-15',
+  NEXT_MONDAY: '2026-09-21',
+  NEXT_TUESDAY: '2026-09-22',
+  NEXT_WEDNESDAY: '2026-09-23',
+  NEXT_THURSDAY: '2026-09-24',
+  LAST_MONDAY: '2026-09-28',
+  LAST_WEDNESDAY: '2026-09-30'
+} as const;
 
 const DRAG_EVENT_TYPES = {
   START: 'dragstart',
@@ -47,13 +64,20 @@ const TITLES = {
   MONTH: 'Umzug',
   TIMED: 'Block',
   OPEN: 'Offen',
-  ALL_DAY: 'Ganztags'
+  ALL_DAY: 'Ganztags',
+  TRIP: 'Reise',
+  NIGHT: 'Nachtfahrt',
+  SERIES: 'Sport'
 } as const;
 
 const TIMED_EVENT = { date: TODAY_ISO, time: '09:00', endTime: '10:00', title: TITLES.TIMED };
 const OPEN_EVENT = { date: TODAY_ISO, time: '09:00', title: TITLES.OPEN };
 const ALL_DAY_EVENT = { date: TODAY_ISO, time: '00:00', allDay: true, title: TITLES.ALL_DAY };
 const MONTH_EVENT = { date: TODAY_ISO, time: '10:00', endTime: '11:00', title: TITLES.MONTH };
+const NIGHT_LABELS = { MOVED_START: 'ab 23:00', END: 'bis 01:00' } as const;
+const TRIP_EVENT = { date: DATES.TUESDAY, endDate: NEIGHBOUR_ISO, time: '00:00', allDay: true, title: TITLES.TRIP };
+const NIGHT_EVENT = { date: TODAY_ISO, endDate: NEIGHBOUR_ISO, time: '22:00', endTime: '01:00', title: TITLES.NIGHT };
+const SERIES_EVENT = { date: DATES.MONDAY, time: '18:00', title: TITLES.SERIES, recurrence: { frequency: 'weekly' as const, interval: 1, until: null } };
 
 interface SyntheticDragOptions {
   data?: string;
@@ -90,6 +114,20 @@ async function dragBlockTo(page: Page, block: Locator, column: Locator, minutes:
   await dragWithMouse(page, grab, drop);
 }
 
+async function occurrenceDates(page: Page, title: string): Promise<string[]> {
+  const events = await fetchEventsBetween(page, SEPTEMBER.from, SEPTEMBER.to);
+  return events.filter((event) => event.title === title).map((event) => event.date);
+}
+
+async function dragSeriesOccurrence(page: Page, scopeSelector: string): Promise<void> {
+  await seedEvents(page, [SERIES_EVENT]);
+  await freezeClock(page);
+  await dayCell(page, DATES.NEXT_MONDAY).locator(SELECTORS.EVENT).dragTo(dayCell(page, DATES.NEXT_WEDNESDAY));
+  await expect(page.locator(SELECTORS.SCOPE_OVERLAY)).toBeVisible();
+  await page.locator(scopeSelector).click();
+  await expect(page.locator(SELECTORS.SCOPE_OVERLAY)).toBeHidden();
+}
+
 async function openWeekWith(page: Page, events: Parameters<typeof seedEvents>[1], scrollMinutes: number): Promise<void> {
   await seedEvents(page, events);
   await freezeClock(page);
@@ -107,6 +145,47 @@ test.describe('month view', () => {
     await expect(dayCell(page, TODAY_ISO).locator(SELECTORS.EVENT)).toHaveCount(0);
     const moved = await fetchEventByTitle(page, TITLES.MONTH);
     expect(moved).toMatchObject({ date: TARGET_ISO, time: MONTH_EVENT.time, endTime: MONTH_EVENT.endTime });
+  });
+
+  test('moves a multi day event by the offset of the dragged middle day', async ({ calendar: { page } }) => {
+    await seedEvents(page, [TRIP_EVENT]);
+    await freezeClock(page);
+    await dayCell(page, TODAY_ISO).locator(SELECTORS.EVENT).dragTo(dayCell(page, DATES.NEXT_WEDNESDAY));
+
+    for (const date of [DATES.NEXT_TUESDAY, DATES.NEXT_WEDNESDAY, DATES.NEXT_THURSDAY]) {
+      await expect(dayCell(page, date).locator(SELECTORS.EVENT_TITLE)).toHaveText(TITLES.TRIP);
+    }
+    await expect(dayCell(page, TODAY_ISO).locator(SELECTORS.EVENT)).toHaveCount(0);
+    const moved = await fetchEventByTitle(page, TITLES.TRIP);
+    expect(moved).toMatchObject({ date: DATES.NEXT_TUESDAY, endDate: DATES.NEXT_THURSDAY, allDay: true });
+  });
+
+  test('shifts the whole series when a dragged occurrence applies to the series', async ({ calendar: { page } }) => {
+    await dragSeriesOccurrence(page, SELECTORS.SCOPE_SERIES);
+
+    await expect(dayCell(page, DATES.NEXT_WEDNESDAY).locator(SELECTORS.EVENT)).toHaveClass(EVENT_CLASSES.RECURRING);
+    await expect(dayCell(page, DATES.MONDAY).locator(SELECTORS.EVENT)).toHaveCount(0);
+    expect(await occurrenceDates(page, TITLES.SERIES)).toEqual([TODAY_ISO, DATES.NEXT_WEDNESDAY, DATES.LAST_WEDNESDAY]);
+  });
+
+  test('detaches only the dragged occurrence from the series', async ({ calendar: { page } }) => {
+    await dragSeriesOccurrence(page, SELECTORS.SCOPE_OCCURRENCE);
+
+    await expect(dayCell(page, DATES.NEXT_WEDNESDAY).locator(SELECTORS.EVENT)).not.toHaveClass(EVENT_CLASSES.RECURRING);
+    await expect(dayCell(page, DATES.NEXT_MONDAY).locator(SELECTORS.EVENT)).toHaveCount(0);
+    const events = await fetchEventsBetween(page, SEPTEMBER.from, SEPTEMBER.to);
+    const detached = events.find((event) => event.date === DATES.NEXT_WEDNESDAY);
+    const series = events.find((event) => event.date === DATES.MONDAY);
+    expect(detached).toMatchObject({ title: TITLES.SERIES, time: SERIES_EVENT.time, recurrence: null });
+    expect(detached?.id).not.toBe(series?.id);
+    expect(await occurrenceDates(page, TITLES.SERIES)).toEqual([DATES.MONDAY, DATES.NEXT_WEDNESDAY, DATES.LAST_MONDAY]);
+  });
+
+  test('keeps the series unchanged when the scope prompt is cancelled', async ({ calendar: { page } }) => {
+    await dragSeriesOccurrence(page, SELECTORS.SCOPE_CANCEL);
+
+    await expect(dayCell(page, DATES.NEXT_MONDAY).locator(SELECTORS.EVENT)).toHaveCount(1);
+    expect(await occurrenceDates(page, TITLES.SERIES)).toEqual([DATES.MONDAY, DATES.NEXT_MONDAY, DATES.LAST_MONDAY]);
   });
 
   test('highlights the day under the dragged pill and clears it after the drop', async ({ calendar: { page } }) => {
@@ -170,14 +249,43 @@ test.describe('time grid', () => {
     expect(moved).toMatchObject({ date: TODAY_ISO, time: '13:00', endTime: null });
   });
 
-  test('moves an all day block to another day without changing its time', async ({ calendar: { page } }) => {
-    await openWeekWith(page, [ALL_DAY_EVENT], 0);
-    const block = timeGridColumn(page, TODAY_ISO).locator(SELECTORS.EVENT);
-    await dragBlockTo(page, block, timeGridColumn(page, TARGET_ISO), NIGHT_MINUTES);
+  test('moves an all day pill within the all day row to another day', async ({ calendar: { page } }) => {
+    await openWeekWith(page, [ALL_DAY_EVENT], NIGHT_MINUTES);
+    await allDayCell(page, TODAY_ISO).locator(SELECTORS.EVENT).dragTo(allDayCell(page, TARGET_ISO));
 
-    await expect(timeGridColumn(page, TARGET_ISO).locator(SELECTORS.EVENT_TITLE)).toHaveText(TITLES.ALL_DAY);
+    await expect(allDayCell(page, TARGET_ISO).locator(SELECTORS.EVENT_TITLE)).toHaveText(TITLES.ALL_DAY);
     const moved = await fetchEventByTitle(page, TITLES.ALL_DAY);
     expect(moved).toMatchObject({ date: TARGET_ISO, time: ALL_DAY_EVENT.time, allDay: true });
+  });
+
+  test('drops an all day pill into a time column without changing its time', async ({ calendar: { page } }) => {
+    await openWeekWith(page, [ALL_DAY_EVENT], NIGHT_MINUTES);
+    const source = await centerOf(allDayCell(page, TODAY_ISO).locator(SELECTORS.EVENT));
+    await dragWithMouse(page, source, await pointAtMinutes(timeGridColumn(page, TARGET_ISO), NIGHT_MINUTES));
+
+    await expect(allDayCell(page, TARGET_ISO).locator(SELECTORS.EVENT_TITLE)).toHaveText(TITLES.ALL_DAY);
+    const moved = await fetchEventByTitle(page, TITLES.ALL_DAY);
+    expect(moved).toMatchObject({ date: TARGET_ISO, time: ALL_DAY_EVENT.time, allDay: true });
+  });
+
+  test('moves the start of a timed multi day event and keeps its end time', async ({ calendar: { page } }) => {
+    await openWeekWith(page, [NIGHT_EVENT], EVENING_MINUTES);
+    const block = timeGridColumn(page, TODAY_ISO).locator(SELECTORS.EVENT);
+    await dragBlockTo(page, block, timeGridColumn(page, NEIGHBOUR_ISO), LATE_EVENING_MINUTES);
+
+    await expect(timeGridColumn(page, NEIGHBOUR_ISO).locator(SELECTORS.EVENT_TIME)).toHaveText(NIGHT_LABELS.MOVED_START);
+    const moved = await fetchEventByTitle(page, TITLES.NIGHT);
+    expect(moved).toMatchObject({ date: NEIGHBOUR_ISO, endDate: TARGET_ISO, time: '23:00', endTime: NIGHT_EVENT.endTime });
+  });
+
+  test('keeps the time when a later day of a timed multi day event is dropped into a time column', async ({ calendar: { page } }) => {
+    await openWeekWith(page, [NIGHT_EVENT], 0);
+    const block = timeGridColumn(page, NEIGHBOUR_ISO).locator(SELECTORS.EVENT);
+    await dragBlockTo(page, block, timeGridColumn(page, TARGET_ISO), NIGHT_MINUTES);
+
+    await expect(timeGridColumn(page, TARGET_ISO).locator(SELECTORS.EVENT_TIME)).toHaveText(NIGHT_LABELS.END);
+    const moved = await fetchEventByTitle(page, TITLES.NIGHT);
+    expect(moved).toMatchObject({ date: NEIGHBOUR_ISO, endDate: TARGET_ISO, time: NIGHT_EVENT.time, endTime: NIGHT_EVENT.endTime });
   });
 
   test('highlights the column under a dragged block', async ({ calendar: { page } }) => {

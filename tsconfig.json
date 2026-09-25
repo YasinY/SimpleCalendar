@@ -16,7 +16,13 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@shared/*": ["./src/shared/*"],
+      "@main/*": ["./src/main/*"],
+      "@renderer/*": ["./src/renderer/*"],
+      "@tests/*": ["./tests/*"]
+    }
   },
   "include": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.mts", "playwright.config.ts", "drizzle.config.ts"]
 }

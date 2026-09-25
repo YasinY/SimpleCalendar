@@ -1,4 +1,4 @@
-import { closestElement } from '../dom/elements';
+import { closestElement } from '@renderer/dom/elements';
 import { DRAG_EVENTS, allowDrop, readDragPayload } from './dragTransfer';
 import type { DropHandler } from './dropHandler';
 import type { DropZoneOptions } from './dropZoneOptions';

@@ -1,6 +1,7 @@
 import { CalendarApp } from './CalendarApp';
 import { DiscardPrompt } from './dialogs/DiscardPrompt';
 import { EventDialog } from './dialogs/EventDialog';
+import { SeriesScopePrompt } from './dialogs/SeriesScopePrompt';
 import { SettingsDialog } from './dialogs/SettingsDialog';
 import { requireElementById } from './dom/elements';
 import { queryCalendarElements } from './dom/queryCalendarElements';
@@ -8,12 +9,13 @@ import { MonthView } from './views/MonthView';
 import { TimeGridView } from './views/TimeGridView';
 import { WeatherBadge } from './weather/WeatherBadge';
 import type { CalendarAppFactories } from './calendarAppFactories';
-import type { CalendarApi } from '../shared/calendarApi';
+import type { CalendarApi } from '@shared/calendarApi';
 
 const OVERLAY_IDS = {
   EVENT_DIALOG: 'dialogOverlay',
   SETTINGS_DIALOG: 'settingsOverlay',
   DISCARD_PROMPT: 'discardOverlay',
+  SCOPE_PROMPT: 'scopeOverlay',
   WEATHER_BADGE: 'weatherBadge'
 } as const;
 
@@ -24,6 +26,7 @@ function createFactories(): CalendarAppFactories {
     createTimeGridView: (handlers) => new TimeGridView(handlers),
     createEventDialog: (handlers) => new EventDialog(requireElementById(OVERLAY_IDS.EVENT_DIALOG), handlers, discardPrompt),
     createSettingsDialog: (handlers) => new SettingsDialog(requireElementById(OVERLAY_IDS.SETTINGS_DIALOG), handlers, discardPrompt),
+    createScopePrompt: () => new SeriesScopePrompt(requireElementById(OVERLAY_IDS.SCOPE_PROMPT)),
     createWeatherBadge: (options) => new WeatherBadge(requireElementById(OVERLAY_IDS.WEATHER_BADGE), options)
   };
 }

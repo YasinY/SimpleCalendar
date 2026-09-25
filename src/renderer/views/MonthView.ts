@@ -6,23 +6,27 @@ import {
   HOLIDAY_NAME_SEPARATOR,
   MIN_STRETCHED_DURATION_STEPS,
   WEEKDAY_LABELS
-} from '../constants';
-import { getDurationSteps, sortByTime } from '../date/dateUtils';
-import { closestElement, createElement, createTitledElement } from '../dom/elements';
-import { makeDraggable } from '../dragDrop/dragTransfer';
-import { DropZoneTracker } from '../dragDrop/DropZoneTracker';
-import { decorateEventPill } from '../events/eventPill';
-import type { MonthCell } from '../date/monthCell';
-import type { MonthGrid } from '../date/monthGrid';
-import type { HolidayMap } from '../holidays/holidayDates';
-import type { EventsByDate } from './eventsByDate';
+} from '@renderer/constants';
+import { getDurationSteps } from '@renderer/date/dateUtils';
+import { closestElement, createElement, createTitledElement } from '@renderer/dom/elements';
+import { makeDraggable } from '@renderer/dragDrop/dragTransfer';
+import { resolveDropDate } from '@renderer/dragDrop/dropDate';
+import { DropZoneTracker } from '@renderer/dragDrop/DropZoneTracker';
+import { isSingleDay, sortSegmentsByStart } from '@renderer/events/daySegments';
+import { toEventKey } from '@renderer/events/eventKey';
+import { decorateEventPill } from '@renderer/events/eventPill';
+import type { MonthCell } from '@renderer/date/monthCell';
+import type { MonthGrid } from '@renderer/date/monthGrid';
+import type { DaySegment } from '@renderer/events/daySegment';
+import type { HolidayMap } from '@renderer/holidays/holidayDates';
 import type { MonthRenderer } from './monthRenderer';
 import type { MonthViewHandlers } from './monthViewHandlers';
-import type { CalendarEvent } from '../../shared/calendarEvent';
+import type { SegmentsByDate } from './segmentsByDate';
+import type { CalendarEvent } from '@shared/calendarEvent';
 
 const DAY_SELECTOR = '.' + CSS_CLASSES.DAY;
 const EVENT_SELECTOR = '.' + CSS_CLASSES.EVENT;
-const NO_TIME_OFFSET = 0;
+const KEEP_TIME = null;
 const EMPTY_DATE = '';
 
 export class MonthView implements MonthRenderer {
@@ -41,13 +45,13 @@ export class MonthView implements MonthRenderer {
     this.#bindInteractions();
   }
 
-  render({ cells, weekCount }: MonthGrid, eventsByDate: EventsByDate, holidaysByDate: HolidayMap): void {
+  render({ cells, weekCount }: MonthGrid, segmentsByDate: SegmentsByDate, holidaysByDate: HolidayMap): void {
     this.#applyWeekCount(weekCount);
     const fragment = document.createDocumentFragment();
     for (const cell of cells) {
-      const events = eventsByDate.get(cell.iso) ?? [];
+      const segments = segmentsByDate.get(cell.iso) ?? [];
       const holidayNames = holidaysByDate.get(cell.iso) ?? [];
-      fragment.append(this.#createDayCell(cell, events, holidayNames));
+      fragment.append(this.#createDayCell(cell, segments, holidayNames));
     }
     this.#gridElement.replaceChildren(fragment);
   }
@@ -73,7 +77,7 @@ export class MonthView implements MonthRenderer {
     gridElement.addEventListener('click', (domEvent) => {
       const eventElement = closestElement(domEvent.target, EVENT_SELECTOR);
       if (!eventElement) return;
-      this.#handlers.onEventActivate(eventElement.dataset[DATASET_KEYS.EVENT_ID] ?? EMPTY_DATE);
+      this.#handlers.onEventActivate(eventElement.dataset[DATASET_KEYS.EVENT_KEY] ?? EMPTY_DATE);
     });
 
     gridElement.addEventListener('dblclick', (domEvent) => {
@@ -86,11 +90,14 @@ export class MonthView implements MonthRenderer {
     new DropZoneTracker(gridElement, {
       zoneSelector: DAY_SELECTOR,
       highlightClass: CSS_CLASSES.DROP_TARGET,
-      onDrop: (payload, dayElement) => this.#handlers.onEventDrop(payload.eventId, { date: dayElement.dataset[DATASET_KEYS.DATE] ?? EMPTY_DATE })
+      onDrop: (payload, dayElement) => {
+        const date = resolveDropDate(dayElement.dataset[DATASET_KEYS.DATE] ?? EMPTY_DATE, payload.dayOffset);
+        this.#handlers.onEventDrop(payload.eventKey, { date });
+      }
     });
   }
 
-  #createDayCell(cell: MonthCell, events: CalendarEvent[], holidayNames: string[]): HTMLElement {
+  #createDayCell(cell: MonthCell, segments: DaySegment[], holidayNames: string[]): HTMLElement {
     const dayElement = createElement('div', CSS_CLASSES.DAY);
     const classList = dayElement.classList;
     dayElement.dataset[DATASET_KEYS.DATE] = cell.iso;
@@ -106,18 +113,22 @@ export class MonthView implements MonthRenderer {
     dayElement.append(header);
 
     const eventList = createElement('div', CSS_CLASSES.DAY_EVENTS);
-    for (const event of sortByTime(events)) {
-      eventList.append(this.#createEventPill(event));
+    for (const segment of sortSegmentsByStart(segments)) {
+      eventList.append(this.#createEventPill(segment));
     }
     dayElement.append(eventList);
     return dayElement;
   }
 
-  #createEventPill(event: CalendarEvent): HTMLButtonElement {
-    const pill = decorateEventPill(createElement('button', CSS_CLASSES.EVENT), event);
+  #createEventPill(segment: DaySegment): HTMLButtonElement {
+    const pill = decorateEventPill(createElement('button', CSS_CLASSES.EVENT), segment);
+    if (isSingleDay(segment)) this.#applyDurationClass(pill, segment.event);
+    makeDraggable(pill, () => ({ eventKey: toEventKey(segment.event), dayOffset: segment.dayOffset, offsetMinutes: KEEP_TIME }));
+    return pill;
+  }
+
+  #applyDurationClass(pill: HTMLButtonElement, event: CalendarEvent): void {
     const durationSteps = getDurationSteps(event);
     if (durationSteps >= MIN_STRETCHED_DURATION_STEPS) pill.classList.add(EVENT_DURATION_CLASS_PREFIX + durationSteps);
-    makeDraggable(pill, () => ({ eventId: event.id, offsetMinutes: NO_TIME_OFFSET }));
-    return pill;
   }
 }

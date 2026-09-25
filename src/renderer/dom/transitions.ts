@@ -1,4 +1,4 @@
-import { REDUCED_MOTION_QUERY, TRANSITION_DATASET_KEY, type TransitionDirection } from '../constants';
+import { REDUCED_MOTION_QUERY, TRANSITION_DATASET_KEY, type TransitionDirection } from '@renderer/constants';
 
 function prefersReducedMotion(): boolean {
   return window.matchMedia(REDUCED_MOTION_QUERY).matches;

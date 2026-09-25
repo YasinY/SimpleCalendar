@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi, type Mock, type MockInstance } from 'vitest';
-import { DialogOverlay } from '../../../../src/renderer/dialogs/DialogOverlay';
-import { DiscardPrompt } from '../../../../src/renderer/dialogs/DiscardPrompt';
-import { ESCAPE_KEY, HIDDEN_ATTRIBUTE } from '../../../../src/renderer/constants';
-import { mountIndexDocument, requireById } from '../../../support/indexDocument';
+import { DialogOverlay } from '@renderer/dialogs/DialogOverlay';
+import { DiscardPrompt } from '@renderer/dialogs/DiscardPrompt';
+import { ESCAPE_KEY, HIDDEN_ATTRIBUTE } from '@renderer/constants';
+import { mountIndexDocument, requireById } from '@tests/support/indexDocument';
 
 const OVERLAY_ID = 'dialogOverlay';
 const DISCARD_OVERLAY_ID = 'discardOverlay';

@@ -14,13 +14,17 @@ import {
   LEGACY_EVENTS_FILE_NAME,
   LEGACY_EVENTS_MIGRATED_SUFFIX,
   SETTINGS_FILE_NAME
-} from '../../src/main/constants';
-import { DEFAULT_SETTINGS } from '../../src/shared/settingsDefaults';
-import type { CalendarEvent } from '../../src/shared/calendarEvent';
-import type { EventInput } from '../../src/shared/eventInput';
-import type { Settings } from '../../src/shared/settings';
+} from '@main/constants';
+import { DEFAULT_SETTINGS } from '@shared/settingsDefaults';
+import type { CalendarEvent } from '@shared/calendarEvent';
+import type { EventInput } from '@shared/eventInput';
+import type { OccurrenceRef } from '@shared/occurrenceRef';
+import type { Recurrence } from '@shared/recurrence';
+import type { Settings } from '@shared/settings';
 
 const EVENT_DATE = '2031-05-14';
+const EVENT_END_DATE = '2031-05-16';
+const EARLIER_DATE = '2031-05-01';
 const EARLIEST_DATE = '';
 const LATEST_DATE = '9999-12-31';
 const START_TIME = '10:00';
@@ -39,6 +43,51 @@ const HOLIDAY_REGION = 'BY';
 const NUMERIC_TITLE = 42;
 const EMPTY_TEXT = '';
 const UNKNOWN_SETTING_KEY = 'unknownSetting';
+const INVALID_FREQUENCY = 'hourly';
+const FRACTIONAL_INTERVAL = 2.5;
+const INVALID_INTERVAL = 0;
+
+const SERIES_DATES = {
+  MONDAY: '2031-05-05',
+  WEDNESDAY: '2031-05-07',
+  NEXT_MONDAY: '2031-05-12',
+  NEXT_WEDNESDAY: '2031-05-14',
+  THIRD_MONDAY: '2031-05-19',
+  THIRD_WEDNESDAY: '2031-05-21',
+  RANGE_END: '2031-05-25'
+} as const;
+
+const WEEKLY: Recurrence = { frequency: 'weekly', interval: 1, until: null };
+
+const WEEKLY_SERIES: EventInput = { date: SERIES_DATES.MONDAY, time: START_TIME, title: 'Wochentermin', recurrence: WEEKLY };
+
+const MONTH_END_SERIES = {
+  id: 'legacy-month-end',
+  date: '2031-01-31',
+  endDate: '2031-02-01',
+  time: START_TIME,
+  title: 'Monatsabschluss',
+  recurrence: { frequency: 'monthly', interval: 1, until: '2031-04-30' },
+  notified: true
+};
+
+const MONTH_END_OCCURRENCES = [
+  { date: '2031-01-31', endDate: '2031-02-01', notified: true },
+  { date: '2031-02-28', endDate: '2031-03-01', notified: false },
+  { date: '2031-03-31', endDate: '2031-04-01', notified: false },
+  { date: '2031-04-30', endDate: '2031-05-01', notified: false }
+];
+
+const INVALID_SERIES = {
+  id: 'legacy-invalid-series',
+  date: EVENT_DATE,
+  endDate: EARLIER_DATE,
+  time: START_TIME,
+  title: 'Ohne gültige Serie',
+  recurrence: { frequency: INVALID_FREQUENCY, interval: FRACTIONAL_INTERVAL }
+};
+
+const LEAP_DAY_SERIES = { from: '2032-01-01', to: '2034-12-31', dates: ['2032-02-29', '2033-02-28', '2034-02-28'] } as const;
 
 const FULL_LEGACY_EVENT: CalendarEvent = {
   id: FULL_EVENT_ID,
@@ -50,6 +99,8 @@ const FULL_LEGACY_EVENT: CalendarEvent = {
   notes: 'Übernommene Notiz',
   color: EVENT_COLOR,
   reminderMinutes: REMINDER_MINUTES,
+  endDate: EVENT_END_DATE,
+  recurrence: null,
   notified: true
 };
 
@@ -59,6 +110,23 @@ function getAllEvents(page: Page): Promise<CalendarEvent[]> {
 
 function saveEvent(page: Page, input: EventInput): Promise<CalendarEvent> {
   return page.evaluate((payload) => window.calendarApi.saveEvent(payload), input);
+}
+
+function getEventsBetween(page: Page, from: string, to: string): Promise<CalendarEvent[]> {
+  return page.evaluate((range) => window.calendarApi.getEvents(range), { from, to });
+}
+
+function saveOccurrence(page: Page, input: EventInput): Promise<CalendarEvent> {
+  return page.evaluate((payload) => window.calendarApi.saveOccurrence(payload), input);
+}
+
+function deleteOccurrence(page: Page, ref: OccurrenceRef): Promise<boolean> {
+  return page.evaluate((occurrence) => window.calendarApi.deleteOccurrence(occurrence), ref);
+}
+
+async function seriesDates(page: Page, id: string): Promise<string[]> {
+  const events = await getEventsBetween(page, SERIES_DATES.MONDAY, SERIES_DATES.RANGE_END);
+  return events.filter((event) => event.id === id).map((event) => event.date);
 }
 
 function saveUntypedEvent(page: Page, input: Record<string, unknown>): Promise<CalendarEvent> {
@@ -91,16 +159,29 @@ test.describe('legacy events import', () => {
     const events = await getAllEvents(page);
     const legacyPath = path.join(userData, LEGACY_EVENTS_FILE_NAME);
 
-    expect(events).toHaveLength(3);
+    expect(events).toHaveLength(2);
     expect(events.find((event) => event.id === FULL_EVENT_ID)).toEqual({ ...FULL_LEGACY_EVENT, title: FULL_LEGACY_EVENT.title.trim() });
     const generated = events.filter((event) => event.id !== FULL_EVENT_ID);
     for (const event of generated) {
       expect(event.id).toMatch(UUID_PATTERN);
-      expect(event).toMatchObject({ time: EMPTY_TEXT, endTime: null, allDay: false, title: EMPTY_TEXT, notes: EMPTY_TEXT, color: null, reminderMinutes: null, notified: false });
+      expect(event).toMatchObject({ endDate: null, time: EMPTY_TEXT, endTime: null, allDay: false, title: EMPTY_TEXT, notes: EMPTY_TEXT, color: null, reminderMinutes: null, recurrence: null, notified: false });
     }
-    expect(generated.map((event) => event.date).sort()).toEqual([EMPTY_TEXT, EVENT_DATE]);
+    expect(generated.map((event) => event.date)).toEqual([EVENT_DATE]);
     expect(existsSync(legacyPath)).toBe(false);
     expect(existsSync(legacyPath + LEGACY_EVENTS_MIGRATED_SUFFIX)).toBe(true);
+  });
+});
+
+test.describe('legacy series import', () => {
+  test.use({ calendarLaunch: { ...DEFAULT_LAUNCH_OPTIONS, legacyEvents: [MONTH_END_SERIES, INVALID_SERIES] } });
+
+  test('expands imported series, keeps the notified occurrence and drops invalid recurrences', async ({ calendar: { page } }) => {
+    const events = await getAllEvents(page);
+    const occurrences = events.filter((event) => event.id === MONTH_END_SERIES.id);
+
+    expect(occurrences.map(({ date, endDate, notified }) => ({ date, endDate, notified }))).toEqual(MONTH_END_OCCURRENCES);
+    expect(occurrences[0].recurrence).toEqual(MONTH_END_SERIES.recurrence);
+    expect(events.find((event) => event.id === INVALID_SERIES.id)).toMatchObject({ endDate: null, recurrence: null });
   });
 });
 
@@ -124,6 +205,94 @@ test('normalizes end time, text, color and reminder of saved events', async ({ c
   expect(await saveEvent(page, { ...base, endTime: EMPTY_TEXT, reminderMinutes: Number.NaN })).toMatchObject({ endTime: null, reminderMinutes: null });
   expect(await saveUntypedEvent(page, { ...base, title: NUMERIC_TITLE, reminderMinutes: String(REMINDER_MINUTES) }))
     .toMatchObject({ endTime: null, title: EMPTY_TEXT, reminderMinutes: null });
+});
+
+test('normalizes end date and recurrence of saved events', async ({ calendar: { page } }) => {
+  const base = { date: EVENT_DATE, time: START_TIME, title: 'Serie normalisiert' };
+
+  expect(await saveEvent(page, { ...base, endDate: EVENT_END_DATE, endTime: EARLIER_TIME })).toMatchObject({ endDate: EVENT_END_DATE, endTime: EARLIER_TIME });
+  expect(await saveEvent(page, { ...base, endDate: EARLIER_DATE })).toMatchObject({ endDate: null });
+  expect(await saveEvent(page, { ...base, endDate: EMPTY_TEXT })).toMatchObject({ endDate: null });
+  expect(await saveUntypedEvent(page, { ...base, recurrence: { frequency: INVALID_FREQUENCY, interval: 1 } })).toMatchObject({ recurrence: null });
+  expect(await saveUntypedEvent(page, { ...base, recurrence: WEEKLY.frequency })).toMatchObject({ recurrence: null });
+  expect(await saveUntypedEvent(page, { ...base, recurrence: { frequency: WEEKLY.frequency, interval: FRACTIONAL_INTERVAL } }))
+    .toMatchObject({ recurrence: { frequency: WEEKLY.frequency, interval: 1, until: null } });
+
+  const leapDay = await saveUntypedEvent(page, { ...base, date: LEAP_DAY_SERIES.dates[0], recurrence: { frequency: 'yearly', interval: INVALID_INTERVAL, until: EMPTY_TEXT } });
+  expect(leapDay.recurrence).toEqual({ frequency: 'yearly', interval: 1, until: null });
+  const leapDayOccurrences = await getEventsBetween(page, LEAP_DAY_SERIES.from, LEAP_DAY_SERIES.to);
+  expect(leapDayOccurrences.filter((event) => event.id === leapDay.id).map((event) => event.date)).toEqual(LEAP_DAY_SERIES.dates);
+});
+
+test('returns multi day events that overlap the start of the range', async ({ calendar: { page } }) => {
+  const saved = await saveEvent(page, { date: EARLIER_DATE, endDate: EVENT_DATE, time: START_TIME, title: 'Lange Reise' });
+  expect(await getEventsBetween(page, EVENT_DATE, EVENT_END_DATE)).toEqual([saved]);
+  expect(await getEventsBetween(page, EVENT_END_DATE, EVENT_END_DATE)).toEqual([]);
+});
+
+test('shifts the whole series when an occurrence is saved with a new date', async ({ calendar: { page } }) => {
+  const series = await saveEvent(page, WEEKLY_SERIES);
+  await saveEvent(page, { ...WEEKLY_SERIES, id: series.id, occurrenceDate: SERIES_DATES.NEXT_MONDAY, date: SERIES_DATES.NEXT_WEDNESDAY });
+
+  expect(await seriesDates(page, series.id)).toEqual([SERIES_DATES.WEDNESDAY, SERIES_DATES.NEXT_WEDNESDAY, SERIES_DATES.THIRD_WEDNESDAY]);
+});
+
+test('moves a single event to the new date even with an occurrence date', async ({ calendar: { page } }) => {
+  const single = await saveEvent(page, { date: SERIES_DATES.MONDAY, time: START_TIME, title: 'Einzeln' });
+  const moved = await saveEvent(page, { ...single, occurrenceDate: SERIES_DATES.MONDAY, date: SERIES_DATES.WEDNESDAY });
+  expect(moved).toMatchObject({ id: single.id, date: SERIES_DATES.WEDNESDAY });
+});
+
+test('detaches a saved occurrence from its series', async ({ calendar: { page } }) => {
+  const series = await saveEvent(page, WEEKLY_SERIES);
+  const detached = await saveOccurrence(page, {
+    ...WEEKLY_SERIES,
+    id: series.id,
+    occurrenceDate: SERIES_DATES.NEXT_MONDAY,
+    date: SERIES_DATES.NEXT_WEDNESDAY,
+    title: 'Einmal verschoben'
+  });
+
+  expect(detached.id).not.toBe(series.id);
+  expect(detached).toMatchObject({ date: SERIES_DATES.NEXT_WEDNESDAY, title: 'Einmal verschoben', recurrence: null });
+  expect(await seriesDates(page, series.id)).toEqual([SERIES_DATES.MONDAY, SERIES_DATES.THIRD_MONDAY]);
+  expect(await seriesDates(page, detached.id)).toEqual([SERIES_DATES.NEXT_WEDNESDAY]);
+});
+
+test('saves an occurrence of a single event or without occurrence date like a regular event', async ({ calendar: { page } }) => {
+  const single = await saveEvent(page, { date: SERIES_DATES.MONDAY, time: START_TIME, title: 'Einzeln' });
+  const updated = await saveOccurrence(page, { ...single, occurrenceDate: SERIES_DATES.MONDAY, title: 'Geändert' });
+  const series = await saveEvent(page, WEEKLY_SERIES);
+  const renamedSeries = await saveOccurrence(page, { ...WEEKLY_SERIES, id: series.id, title: 'Serie geändert' });
+
+  expect(updated).toMatchObject({ id: single.id, title: 'Geändert', recurrence: null });
+  expect(renamedSeries).toMatchObject({ id: series.id, title: 'Serie geändert', recurrence: WEEKLY });
+  expect(await seriesDates(page, series.id)).toEqual([SERIES_DATES.MONDAY, SERIES_DATES.NEXT_MONDAY, SERIES_DATES.THIRD_MONDAY]);
+});
+
+test('skips deleted occurrences and removes the exceptions with the series', async ({ calendar: { page } }) => {
+  const series = await saveEvent(page, WEEKLY_SERIES);
+  const skippedOccurrence = { id: series.id, occurrenceDate: SERIES_DATES.NEXT_MONDAY };
+
+  expect(await deleteOccurrence(page, skippedOccurrence)).toBe(true);
+  expect(await deleteOccurrence(page, skippedOccurrence)).toBe(true);
+  expect(await deleteOccurrence(page, { id: series.id, occurrenceDate: SERIES_DATES.THIRD_MONDAY })).toBe(true);
+  expect(await seriesDates(page, series.id)).toEqual([SERIES_DATES.MONDAY]);
+
+  await saveEvent(page, { ...WEEKLY_SERIES, id: series.id, recurrence: null });
+  await saveEvent(page, { ...WEEKLY_SERIES, id: series.id });
+  expect(await seriesDates(page, series.id)).toEqual([SERIES_DATES.MONDAY, SERIES_DATES.NEXT_MONDAY, SERIES_DATES.THIRD_MONDAY]);
+
+  expect(await deleteOccurrence(page, skippedOccurrence)).toBe(true);
+  expect(await page.evaluate((id) => window.calendarApi.deleteEvent(id), series.id)).toBe(true);
+  expect(await getAllEvents(page)).toEqual([]);
+});
+
+test('deletes a single event through an occurrence and reports unknown ids', async ({ calendar: { page } }) => {
+  const single = await saveEvent(page, { date: EVENT_DATE, time: START_TIME, title: 'Einzeln' });
+  expect(await deleteOccurrence(page, { id: single.id, occurrenceDate: EVENT_DATE })).toBe(true);
+  expect(await deleteOccurrence(page, { id: UNKNOWN_EVENT_ID, occurrenceDate: EVENT_DATE })).toBe(false);
+  expect(await getAllEvents(page)).toEqual([]);
 });
 
 test('updates an existing event by id and creates a new one for an unknown id', async ({ calendar: { page } }) => {

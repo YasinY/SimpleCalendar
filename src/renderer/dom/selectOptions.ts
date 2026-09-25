@@ -1,4 +1,4 @@
-import type { SelectOption } from '../selectOption';
+import type { SelectOption } from '@renderer/selectOption';
 
 export function fillSelect(select: HTMLSelectElement, options: SelectOption[]): void {
   const fragment = document.createDocumentFragment();

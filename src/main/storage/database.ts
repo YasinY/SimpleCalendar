@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/node-sqlite';
 import { migrate } from 'drizzle-orm/node-sqlite/migrator';
-import { MIGRATIONS_PATH } from '../constants';
+import { MIGRATIONS_PATH } from '@main/constants';
 
 const WAL_PRAGMA = 'PRAGMA journal_mode = WAL';
 

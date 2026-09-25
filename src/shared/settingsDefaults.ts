@@ -5,5 +5,6 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   weatherCity: '',
   weatherLocation: null,
-  viewMode: 'month'
+  viewMode: 'month',
+  autoUpdate: true
 };

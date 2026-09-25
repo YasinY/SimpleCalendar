@@ -5,7 +5,7 @@ import {
   createTitledElement,
   requireElement,
   requireElementById
-} from '../../../../src/renderer/dom/elements';
+} from '@renderer/dom/elements';
 
 const CLASS_NAME = 'box';
 const TEXT = 'Hallo';

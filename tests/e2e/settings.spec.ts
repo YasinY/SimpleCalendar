@@ -4,8 +4,8 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import { DEFAULT_LAUNCH_OPTIONS, expect, test } from './support/calendarFixture';
 import { openSettings, saveSettings, SETTINGS_SELECTORS } from './support/settingsDialogActions';
 import { DEFAULT_COORDINATES, mockForecast, mockGeocoding } from './support/weatherRoutes';
-import type { Settings } from '../../src/shared/settings';
-import type { Theme } from '../../src/shared/theme';
+import type { Settings } from '@shared/settings';
+import type { Theme } from '@shared/theme';
 
 const SETTINGS_FILE_NAME = 'settings.json';
 const FILE_ENCODING = 'utf8';
@@ -76,6 +76,30 @@ test('trims the city before saving and shows the trimmed value when reopening', 
   await expect(page.locator(WEATHER_BADGE)).toBeVisible();
   await expectDialogValues(page, { region: NATIONWIDE_REGION, theme: THEMES.SYSTEM, city: TRIMMED_CITY });
   expect(readStoredSettings(userData).weatherCity).toBe(TRIMMED_CITY);
+});
+
+test('enables auto update by default and stores it when disabled', async ({ calendar: { page, userData } }) => {
+  await openSettings(page);
+  await expect(page.locator(SETTINGS_SELECTORS.AUTO_UPDATE)).toBeChecked();
+  await page.locator(SETTINGS_SELECTORS.CANCEL).click();
+
+  await saveSettings(page, { autoUpdate: false });
+  await expect.poll(() => readStoredSettings(userData).autoUpdate).toBe(false);
+  await openSettings(page);
+  await expect(page.locator(SETTINGS_SELECTORS.AUTO_UPDATE)).not.toBeChecked();
+});
+
+test.describe('with auto update disabled', () => {
+  test.use({ calendarLaunch: { ...DEFAULT_LAUNCH_OPTIONS, settings: { autoUpdate: false } } });
+
+  test('shows the disabled auto update and stores it when enabled again', async ({ calendar: { page, userData } }) => {
+    await openSettings(page);
+    await expect(page.locator(SETTINGS_SELECTORS.AUTO_UPDATE)).not.toBeChecked();
+    await page.locator(SETTINGS_SELECTORS.CANCEL).click();
+
+    await saveSettings(page, { autoUpdate: true });
+    await expect.poll(() => readStoredSettings(userData).autoUpdate).toBe(true);
+  });
 });
 
 test.describe('with a configured city', () => {

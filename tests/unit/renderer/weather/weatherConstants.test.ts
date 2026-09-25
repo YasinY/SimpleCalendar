@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { UNKNOWN_CONDITION, WEATHER_CONDITIONS, WEATHER_ICONS } from '../../../../src/renderer/weather/weatherConstants';
+import { UNKNOWN_CONDITION, WEATHER_CONDITIONS, WEATHER_ICONS } from '@renderer/weather/weatherConstants';
 
 const SVG_START = '<svg';
 const SVG_END = '</svg>';

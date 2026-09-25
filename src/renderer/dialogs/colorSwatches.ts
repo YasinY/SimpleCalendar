@@ -1,6 +1,6 @@
-import { CSS_CLASSES, SWATCH_CLASS_PREFIX } from '../constants';
-import { createElement } from '../dom/elements';
-import { EVENT_COLORS, type EventColor } from '../events/eventColors';
+import { CSS_CLASSES, SWATCH_CLASS_PREFIX } from '@renderer/constants';
+import { createElement } from '@renderer/dom/elements';
+import { EVENT_COLORS, type EventColor } from '@renderer/events/eventColors';
 
 const COLOR_INPUT_NAME = 'eventColor';
 const RADIO_TYPE = 'radio';

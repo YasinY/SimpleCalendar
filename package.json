@@ -39,6 +39,11 @@
         "nsis"
       ]
     },
+    "publish": {
+      "provider": "github",
+      "owner": "YasinY",
+      "repo": "SimpleCalendar"
+    },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
@@ -53,6 +58,7 @@
     "drizzle-orm": "^1.0.0-rc.4",
     "electron": "^44.4.0",
     "electron-builder": "^26.15.3",
+    "electron-updater": "^6.8.9",
     "esbuild": "^0.28.2",
     "happy-dom": "^20.14.5",
     "monocart-coverage-reports": "^2.13.0",

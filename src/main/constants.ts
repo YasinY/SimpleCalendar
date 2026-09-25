@@ -16,6 +16,7 @@ export const THEME_BACKGROUNDS = {
 } as const;
 
 export const MILLISECONDS_PER_MINUTE = 60000;
+export const MINUTES_PER_DAY = 1440;
 export const REMINDER_CHECK_INTERVAL_MS = 30000;
 
 export const WINDOW_OPTIONS: BrowserWindowConstructorOptions = {

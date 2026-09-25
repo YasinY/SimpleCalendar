@@ -1,25 +1,27 @@
 import { vi, type Mock } from 'vitest';
-import type { CalendarAppFactories } from '../../src/renderer/calendarAppFactories';
-import type { CalendarElements } from '../../src/renderer/calendarElements';
-import type { EventDialogHandlers } from '../../src/renderer/dialogs/eventDialogHandlers';
-import type { EventEditor } from '../../src/renderer/dialogs/eventEditor';
-import type { SettingsDialogHandlers } from '../../src/renderer/dialogs/settingsDialogHandlers';
-import type { SettingsEditor } from '../../src/renderer/dialogs/settingsEditor';
-import type { MonthRenderer } from '../../src/renderer/views/monthRenderer';
-import type { MonthViewHandlers } from '../../src/renderer/views/monthViewHandlers';
-import type { TimeGridHandlers } from '../../src/renderer/views/timeGridHandlers';
-import type { TimeGridRenderer } from '../../src/renderer/views/timeGridRenderer';
-import type { WeatherBadgeOptions } from '../../src/renderer/weather/weatherBadgeOptions';
-import type { WeatherPresenter } from '../../src/renderer/weather/weatherPresenter';
-import type { CalendarApi } from '../../src/shared/calendarApi';
-import type { CalendarEvent } from '../../src/shared/calendarEvent';
-import type { Settings } from '../../src/shared/settings';
-import type { ViewMode } from '../../src/shared/viewMode';
+import type { CalendarAppFactories } from '@renderer/calendarAppFactories';
+import type { CalendarElements } from '@renderer/calendarElements';
+import type { EventDialogHandlers } from '@renderer/dialogs/eventDialogHandlers';
+import type { EventEditor } from '@renderer/dialogs/eventEditor';
+import type { ScopeChooser } from '@renderer/dialogs/scopeChooser';
+import type { SettingsDialogHandlers } from '@renderer/dialogs/settingsDialogHandlers';
+import type { SettingsEditor } from '@renderer/dialogs/settingsEditor';
+import type { MonthRenderer } from '@renderer/views/monthRenderer';
+import type { MonthViewHandlers } from '@renderer/views/monthViewHandlers';
+import type { TimeGridHandlers } from '@renderer/views/timeGridHandlers';
+import type { TimeGridRenderer } from '@renderer/views/timeGridRenderer';
+import type { WeatherBadgeOptions } from '@renderer/weather/weatherBadgeOptions';
+import type { WeatherPresenter } from '@renderer/weather/weatherPresenter';
+import type { CalendarApi } from '@shared/calendarApi';
+import type { CalendarEvent } from '@shared/calendarEvent';
+import type { Settings } from '@shared/settings';
+import type { ViewMode } from '@shared/viewMode';
 import { createCalendarEvent } from './calendarEventFactory';
 
 const ELEMENT_TAGS = { CONTAINER: 'div', LABEL: 'span', BUTTON: 'button' } as const;
 const FACTORY_NOT_CALLED = 'factory was not called';
 const VIEW_MODE_ORDER: ViewMode[] = ['month', 'week', 'day'];
+const DEFAULT_SCOPE = 'series';
 
 type MockedMethods<T> = { [Key in keyof T]: T[Key] extends (...args: infer Args) => infer Result ? Mock<(...args: Args) => Result> : T[Key] };
 
@@ -29,6 +31,7 @@ export type MonthViewDouble = MockedMethods<MonthRenderer>;
 export type TimeGridViewDouble = MockedMethods<TimeGridRenderer>;
 export type EventDialogDouble = MockedMethods<EventEditor>;
 export type SettingsDialogDouble = MockedMethods<SettingsEditor>;
+export type ScopePromptDouble = MockedMethods<ScopeChooser>;
 export type WeatherDouble = MockedMethods<WeatherPresenter>;
 
 export interface CalendarAppDoubles {
@@ -37,6 +40,7 @@ export interface CalendarAppDoubles {
   timeGridView: TimeGridViewDouble;
   eventDialog: EventDialogDouble;
   settingsDialog: SettingsDialogDouble;
+  scopePrompt: ScopePromptDouble;
   weather: WeatherDouble;
   monthHandlers(): MonthViewHandlers;
   timeGridHandlers(): TimeGridHandlers;
@@ -79,7 +83,9 @@ export function createCalendarApiMock(settings: Settings, events: CalendarEvent[
   return {
     getEvents: vi.fn<CalendarApi['getEvents']>(async () => events),
     saveEvent: vi.fn<CalendarApi['saveEvent']>(async () => createCalendarEvent()),
+    saveOccurrence: vi.fn<CalendarApi['saveOccurrence']>(async () => createCalendarEvent()),
     deleteEvent: vi.fn<CalendarApi['deleteEvent']>(async () => true),
+    deleteOccurrence: vi.fn<CalendarApi['deleteOccurrence']>(async () => true),
     getSettings: vi.fn<CalendarApi['getSettings']>(async () => settings),
     updateSettings: vi.fn<CalendarApi['updateSettings']>(async (patch) => ({ ...settings, ...patch })),
     minimizeWindow: vi.fn<CalendarApi['minimizeWindow']>(),
@@ -99,6 +105,7 @@ export function createCalendarAppDoubles(): CalendarAppDoubles {
   const timeGridView: TimeGridViewDouble = { element: document.createElement(ELEMENT_TAGS.CONTAINER), start: vi.fn(), render: vi.fn() };
   const eventDialog: EventDialogDouble = { openForDate: vi.fn(), openForEvent: vi.fn(), close: vi.fn() };
   const settingsDialog: SettingsDialogDouble = { open: vi.fn(), close: vi.fn() };
+  const scopePrompt: ScopePromptDouble = { choose: vi.fn(async () => DEFAULT_SCOPE) };
   const weather: WeatherDouble = { start: vi.fn(), configure: vi.fn(async () => {}) };
 
   const factories: CalendarAppFactories = {
@@ -118,6 +125,7 @@ export function createCalendarAppDoubles(): CalendarAppDoubles {
       settingsHandlers = handlers;
       return settingsDialog;
     },
+    createScopePrompt: () => scopePrompt,
     createWeatherBadge: (options) => {
       weatherOptions = options;
       return weather;
@@ -130,6 +138,7 @@ export function createCalendarAppDoubles(): CalendarAppDoubles {
     timeGridView,
     eventDialog,
     settingsDialog,
+    scopePrompt,
     weather,
     monthHandlers: () => requireCaptured(monthHandlers),
     timeGridHandlers: () => requireCaptured(timeGridHandlers),

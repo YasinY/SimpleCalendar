@@ -1,6 +1,7 @@
 import { readJsonFile, writeJsonFile } from './jsonFile';
-import { isPlainObject, pickKnownKeys } from './settingsNormalization';
-import type { Settings } from '../../shared/settings';
+import { isPlainObject } from './plainObject';
+import { pickKnownKeys } from './settingsNormalization';
+import type { Settings } from '@shared/settings';
 
 export class SettingsStore {
   readonly #filePath: string;

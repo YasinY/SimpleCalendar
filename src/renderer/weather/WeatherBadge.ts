@@ -1,4 +1,4 @@
-import { requireElement } from '../dom/elements';
+import { requireElement } from '@renderer/dom/elements';
 import { fetchCurrentWeather, geocodeCity, resolveCondition } from './weatherApi';
 import {
   TEMPERATURE_SUFFIX,
@@ -10,7 +10,7 @@ import {
 import type { CurrentWeather } from './currentWeather';
 import type { WeatherBadgeOptions } from './weatherBadgeOptions';
 import type { WeatherPresenter } from './weatherPresenter';
-import type { WeatherLocation } from '../../shared/weatherLocation';
+import type { WeatherLocation } from '@shared/weatherLocation';
 
 const SELECTORS = {
   ICON: '[data-weather-icon]',

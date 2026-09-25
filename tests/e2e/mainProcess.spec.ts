@@ -15,10 +15,11 @@ import {
   type MainProcessHookGlobals,
   type UserDataLaunchOptions
 } from './support/userDataLaunch';
-import { DATABASE_FILE_NAME, HIDDEN_LAUNCH_FLAG, REMINDER_CHECK_INTERVAL_MS, THEME_BACKGROUNDS } from '../../src/main/constants';
+import { DATABASE_FILE_NAME, HIDDEN_LAUNCH_FLAG, REMINDER_CHECK_INTERVAL_MS, SETTINGS_FILE_NAME, THEME_BACKGROUNDS } from '@main/constants';
 
 const ISO_DATE_LENGTH = 10;
 const MILLISECONDS_PER_MINUTE = 60000;
+const MILLISECONDS_PER_DAY = 86400000;
 const REMINDER_WAIT_MARGIN_MS = 15000;
 const REMINDER_TEST_TIMEOUT_MS = REMINDER_CHECK_INTERVAL_MS * 3;
 const START_OF_DAY = '00:00';
@@ -41,6 +42,14 @@ const DOUBLE_CLICK = 2;
 const ELECTRON_PATH = electronBinary as unknown as string;
 const EXIT_EVENT = 'exit';
 const WAL_FILE_SUFFIX = '-wal';
+const DAYS_BEFORE_TODAY = 3;
+const NEXT_DAY = 1;
+const LATE_TIME = '23:59';
+const SERIES_EVENT_ID = 'due-series';
+const PENDING_EVENT_ID = 'pending-reminder';
+const DAILY_SERIES = { frequency: 'daily', interval: 1, until: null } as const;
+const UPDATE_CHECK_MESSAGE = 'Checking for update';
+const UPDATE_FAILURE_MESSAGE = 'update check failed';
 
 interface WindowState {
   visible: boolean;
@@ -50,10 +59,18 @@ interface WindowState {
   backgroundColor: string;
 }
 
-function todayIso(): string {
+function isoDateInDays(days: number): string {
   const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * MILLISECONDS_PER_MINUTE);
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * MILLISECONDS_PER_MINUTE + days * MILLISECONDS_PER_DAY);
   return local.toISOString().slice(0, ISO_DATE_LENGTH);
+}
+
+function todayIso(): string {
+  return isoDateInDays(0);
+}
+
+function readConsoleMessages(app: ElectronApplication): Promise<string[]> {
+  return app.evaluate(() => (globalThis as unknown as MainProcessHookGlobals).__e2eConsoleMessages);
 }
 
 function readWindowState(app: ElectronApplication): Promise<WindowState> {
@@ -183,6 +200,32 @@ test.describe('reminders on startup', () => {
   });
 });
 
+test.describe('recurring reminders on startup', () => {
+  const today = todayIso();
+  const seriesStart = isoDateInDays(-DAYS_BEFORE_TODAY);
+  const tomorrow = isoDateInDays(NEXT_DAY);
+  test.use({
+    calendarLaunch: {
+      ...DEFAULT_LAUNCH_OPTIONS,
+      legacyEvents: [
+        { id: SERIES_EVENT_ID, date: seriesStart, time: START_OF_DAY, title: 'Tägliche Erinnerung', reminderMinutes: NO_REMINDER_DELAY, recurrence: DAILY_SERIES },
+        { id: PENDING_EVENT_ID, date: tomorrow, time: LATE_TIME, title: 'Morgen spät', reminderMinutes: SHORT_REMINDER_DELAY }
+      ]
+    }
+  });
+
+  test('notifies only the latest due occurrence of a series and leaves pending reminders untouched', async ({ calendar: { page } }) => {
+    const notifiedByDate = async () => {
+      const events = await page.evaluate((range) => window.calendarApi.getEvents(range), { from: seriesStart, to: tomorrow });
+      return events.map((event) => [event.id, event.date, event.notified]);
+    };
+    await expect.poll(notifiedByDate).toContainEqual([SERIES_EVENT_ID, today, true]);
+    const occurrences = await notifiedByDate();
+    expect(occurrences.filter(([, , notified]) => notified)).toEqual([[SERIES_EVENT_ID, today, true]]);
+    expect(occurrences).toContainEqual([PENDING_EVENT_ID, tomorrow, false]);
+  });
+});
+
 test('notifies reminders that become due on the periodic check', async ({ calendar: { page } }) => {
   test.setTimeout(REMINDER_TEST_TIMEOUT_MS);
   const today = todayIso();
@@ -236,6 +279,21 @@ test('registers hidden autostart when running as a packaged app', async () => {
   const running = await launchInFreshUserData({ mainProcessHooks: true });
   const registered = await running.app.evaluate(() => (globalThis as unknown as MainProcessHookGlobals).__e2eLoginItemSettings);
   expect(registered).toEqual([{ openAtLogin: true, args: [HIDDEN_LAUNCH_FLAG] }]);
+  await closeCalendar(running);
+});
+
+test('checks for updates as a packaged app and logs failed update checks', async () => {
+  const running = await launchInFreshUserData({ mainProcessHooks: true });
+  await expect.poll(() => readConsoleMessages(running.app)).toContain(UPDATE_CHECK_MESSAGE);
+  await expect.poll(async () => (await readConsoleMessages(running.app)).join('\n')).toContain(UPDATE_FAILURE_MESSAGE);
+  await closeCalendar(running);
+});
+
+test('does not check for updates when auto update is disabled', async () => {
+  const userData = createUserData({ [SETTINGS_FILE_NAME]: JSON.stringify({ autoUpdate: false }) });
+  const running = await launchInUserData(userData, { ...DEFAULT_USER_DATA_LAUNCH_OPTIONS, mainProcessHooks: true });
+  expect(await running.page.evaluate(() => window.calendarApi.getSettings())).toMatchObject({ autoUpdate: false });
+  expect(await readConsoleMessages(running.app)).not.toContain(UPDATE_CHECK_MESSAGE);
   await closeCalendar(running);
 });
 

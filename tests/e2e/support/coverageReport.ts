@@ -14,9 +14,11 @@ const LINE_LIST_SEPARATOR = ', ';
 
 const RUNTIME_DEAD_LINES: Record<string, number[]> = {
   'src/main/reminders/reminderRules.ts': [20, 21],
-  'src/main/reminders/ReminderScheduler.ts': [17],
-  'src/main/storage/schema.ts': [21],
-  'src/main/tray/TrayManager.ts': [9]
+  'src/main/reminders/ReminderScheduler.ts': [18],
+  'src/main/storage/schema.ts': [27, 36],
+  'src/main/tray/TrayManager.ts': [9],
+  'src/main/updates/UpdateService.ts': [20],
+  'src/renderer/events/eventPill.ts': [19]
 };
 
 interface RawCoverageEntry {

@@ -1,4 +1,4 @@
-import type { Settings } from '../../../src/shared/settings';
+import type { Settings } from '@shared/settings';
 
 export interface CalendarLaunchOptions {
   args: string[];

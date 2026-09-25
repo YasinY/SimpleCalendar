@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildColorSwatches } from '../../../../src/renderer/dialogs/colorSwatches';
-import { CSS_CLASSES, SWATCH_CLASS_PREFIX } from '../../../../src/renderer/constants';
-import { EVENT_COLORS } from '../../../../src/renderer/events/eventColors';
+import { buildColorSwatches } from '@renderer/dialogs/colorSwatches';
+import { CSS_CLASSES, SWATCH_CLASS_PREFIX } from '@renderer/constants';
+import { EVENT_COLORS } from '@renderer/events/eventColors';
 
 const COLOR_INPUT_NAME = 'eventColor';
 const RADIO_TYPE = 'radio';

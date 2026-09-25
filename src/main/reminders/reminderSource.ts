@@ -1,6 +1,6 @@
-import type { CalendarEvent } from '../../shared/calendarEvent';
+import type { CalendarEvent } from '@shared/calendarEvent';
 
 export interface ReminderSource {
-  getPendingReminders(): CalendarEvent[];
-  markNotified(id: string): void;
+  getPendingReminders(referenceDate: string): CalendarEvent[];
+  markNotified(id: string, occurrenceDate: string): void;
 }

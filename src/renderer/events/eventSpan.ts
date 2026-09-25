@@ -1,7 +1,7 @@
-import type { CalendarEvent } from '../../shared/calendarEvent';
+import type { DaySegment } from './daySegment';
 
 export interface EventSpan {
-  event: CalendarEvent;
+  segment: DaySegment;
   start: number;
   end: number;
 }

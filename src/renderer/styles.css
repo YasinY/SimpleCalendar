@@ -129,6 +129,10 @@
   --frosted-filter: saturate(180%) blur(20px);
 
   --hours-column-width: 56px;
+  --all-day-min-height: 30px;
+  --all-day-max-height: 96px;
+  --number-input-width: 96px;
+  --recurring-marker: "\21BB";
   --hour-height: 56px;
   --minute-height: calc(var(--hour-height) / 60);
   --now-line-thickness: 2px;
@@ -1112,5 +1116,75 @@ html[data-transition="switch"]::view-transition-new(calendar) {
   height: var(--icon-size);
   margin: 0;
   accent-color: var(--color-primary);
+}
+
+.field__hint {
+  margin: 0;
+  color: var(--color-ink-muted-48);
+  font-size: var(--text-fine-print-size);
+  font-weight: var(--text-fine-print-weight);
+  line-height: var(--text-fine-print-line);
+  letter-spacing: var(--text-fine-print-tracking);
+}
+
+.field__inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.field__input--number {
+  width: var(--number-input-width);
+  padding-right: var(--space-sm);
+}
+
+.field__unit {
+  color: var(--color-ink-muted-48);
+  font-size: var(--text-caption-size);
+  letter-spacing: var(--text-caption-tracking);
+}
+
+.event--continues-before {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.event--continues-after {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.event--recurring .event__time::after {
+  content: var(--recurring-marker);
+  margin-left: var(--space-xxs);
+}
+
+.time-grid__all-day {
+  display: grid;
+  grid-template-columns: var(--hours-column-width) repeat(var(--day-count), minmax(0, 1fr));
+  flex: none;
+  max-height: var(--all-day-max-height);
+  overflow-y: auto;
+  scrollbar-width: none;
+  background-color: var(--color-canvas);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.time-grid__all-day-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  min-height: var(--all-day-min-height);
+  padding: var(--space-xxs);
+  border-left: 1px solid var(--color-hairline);
+}
+
+.time-grid__all-day-cell--today {
+  background-color: color-mix(in srgb, var(--color-today) 4%, transparent);
+}
+
+.time-grid__all-day-cell.drop-target {
+  background-color: color-mix(in srgb, var(--color-primary) 8%, transparent);
 }
 

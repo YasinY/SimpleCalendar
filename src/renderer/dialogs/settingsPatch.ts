@@ -1,3 +1,3 @@
-import type { Settings } from '../../shared/settings';
+import type { Settings } from '@shared/settings';
 
-export type SettingsPatch = Pick<Settings, 'holidayRegion' | 'theme' | 'weatherCity'>;
+export type SettingsPatch = Pick<Settings, 'holidayRegion' | 'theme' | 'weatherCity' | 'autoUpdate'>;
