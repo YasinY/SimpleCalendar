@@ -1206,6 +1206,11 @@ html[data-transition="switch"]::view-transition-new(calendar) {
   view-transition-name: date-picker-grid;
 }
 
+html[data-transition^="picker-"] .calendar,
+html[data-transition^="picker-"] .titlebar__title {
+  view-transition-name: none;
+}
+
 ::view-transition-old(date-picker-grid),
 ::view-transition-new(date-picker-grid) {
   animation-duration: var(--picker-transition-duration);
