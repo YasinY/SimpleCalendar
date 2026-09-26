@@ -1,6 +1,6 @@
 {
   "name": "simplecalendar",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "private": true,
   "description": "Persönlicher Kalender für Windows mit Feiertagen, Wetter und Erinnerungen, lokal gespeichert im Tray",
   "author": "yasin@yazici.dev",
@@ -27,7 +27,7 @@
     "db:generate": "drizzle-kit generate"
   },
   "build": {
-    "appId": "dev.yazici.simplecalendar",
+    "appId": "dev.yazici.simplecalendar.app",
     "productName": "SimpleCalendar",
     "files": [
       "out/**/*",
@@ -47,6 +47,8 @@
       "repo": "SimpleCalendar"
     },
     "nsis": {
+      "guid": "9cb8d57a-64fa-56bd-a02b-d48ff6b07c0a",
+      "include": "build/installer.nsh",
       "artifactName": "${productName}-Setup-${version}.${ext}",
       "oneClick": true,
       "perMachine": false,

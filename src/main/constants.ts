@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { BrowserWindowConstructorOptions } from 'electron';
 
-export const APP_USER_MODEL_ID = 'dev.yazici.simplecalendar';
+export const APP_USER_MODEL_ID = 'dev.yazici.simplecalendar.app';
 export const APP_LOCALE = 'de-DE';
 export const DATABASE_FILE_NAME = 'calendar.db';
 export const LEGACY_EVENTS_FILE_NAME = 'events.json';
