@@ -127,6 +127,7 @@
   --reveal-clip-margin: 4px;
   --reveal-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
   --picker-duration: 160ms;
+  --picker-transition-duration: 220ms;
   --picker-enter-scale: 0.96;
   --picker-enter-offset: -6px;
   --hover-duration: 120ms;
@@ -1199,6 +1200,32 @@ html[data-transition="switch"]::view-transition-new(calendar) {
   display: grid;
   grid-template-columns: repeat(7, var(--date-picker-cell));
   justify-content: space-between;
+}
+
+.date-picker__grid {
+  view-transition-name: date-picker-grid;
+}
+
+::view-transition-old(date-picker-grid),
+::view-transition-new(date-picker-grid) {
+  animation-duration: var(--picker-transition-duration);
+  animation-timing-function: var(--transition-easing);
+}
+
+html[data-transition="picker-forward"]::view-transition-old(date-picker-grid) {
+  animation-name: slide-out-to-left;
+}
+
+html[data-transition="picker-forward"]::view-transition-new(date-picker-grid) {
+  animation-name: slide-in-from-right;
+}
+
+html[data-transition="picker-backward"]::view-transition-old(date-picker-grid) {
+  animation-name: slide-out-to-right;
+}
+
+html[data-transition="picker-backward"]::view-transition-new(date-picker-grid) {
+  animation-name: slide-in-from-left;
 }
 
 .date-picker__weekday {

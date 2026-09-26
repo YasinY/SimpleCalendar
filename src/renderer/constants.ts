@@ -174,7 +174,9 @@ export const DROP_EFFECT_MOVE = 'move';
 export const TRANSITION_DIRECTIONS = {
   FORWARD: 'forward',
   BACKWARD: 'backward',
-  SWITCH: 'switch'
+  SWITCH: 'switch',
+  PICKER_FORWARD: 'picker-forward',
+  PICKER_BACKWARD: 'picker-backward'
 } as const;
 
 export type TransitionDirection = (typeof TRANSITION_DIRECTIONS)[keyof typeof TRANSITION_DIRECTIONS];

@@ -11,9 +11,10 @@ import {
   PREVIOUS_MONTH_STEP,
   TITLE_SEPARATOR
 } from './datePickerConstants';
-import { ESCAPE_KEY, NO_DATE, WEEKDAY_LABELS } from '@renderer/constants';
+import { ESCAPE_KEY, NO_DATE, TRANSITION_DIRECTIONS, WEEKDAY_LABELS, type TransitionDirection } from '@renderer/constants';
 import { addMonths, buildMonthGrid, fromIsoDate, getMonthTitle, startOfMonth, toIsoDate } from '@renderer/date/dateUtils';
 import { createElement, requireElement } from '@renderer/dom/elements';
+import { runWithTransition } from '@renderer/dom/transitions';
 import type { MonthCell } from '@renderer/date/monthCell';
 
 const BUTTON_TAG = 'button';
@@ -73,8 +74,8 @@ export class DatePicker {
     const title = createElement('span', DATE_PICKER_CLASSES.TITLE, month + TITLE_SEPARATOR + year);
     const previous = createButton(DATE_PICKER_CLASSES.NAV, DATE_PICKER_GLYPHS.PREVIOUS, DATE_PICKER_LABELS.PREVIOUS_MONTH);
     const next = createButton(DATE_PICKER_CLASSES.NAV, DATE_PICKER_GLYPHS.NEXT, DATE_PICKER_LABELS.NEXT_MONTH);
-    previous.addEventListener('click', () => this.#shiftMonth(PREVIOUS_MONTH_STEP));
-    next.addEventListener('click', () => this.#shiftMonth(NEXT_MONTH_STEP));
+    previous.addEventListener('click', () => this.#shiftMonth(PREVIOUS_MONTH_STEP, TRANSITION_DIRECTIONS.PICKER_BACKWARD));
+    next.addEventListener('click', () => this.#shiftMonth(NEXT_MONTH_STEP, TRANSITION_DIRECTIONS.PICKER_FORWARD));
     header.append(title, previous, next);
     return header;
   }
@@ -118,9 +119,9 @@ export class DatePicker {
     return minimum !== NO_DATE && isoDate < minimum;
   }
 
-  #shiftMonth(delta: number): void {
+  #shiftMonth(delta: number, direction: TransitionDirection): void {
     this.#viewMonth = addMonths(this.#viewMonth, delta);
-    this.#render();
+    runWithTransition(direction, () => this.#render());
   }
 
   #select(isoDate: string): void {

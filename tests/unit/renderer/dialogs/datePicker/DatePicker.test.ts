@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DatePicker } from '@renderer/dialogs/datePicker/DatePicker';
 import { attachDatePickers } from '@renderer/dialogs/datePicker/attachDatePickers';
+import { TRANSITION_DATASET_KEY, TRANSITION_DIRECTIONS } from '@renderer/constants';
 import { mountIndexDocument } from '@tests/support/indexDocument';
 
 const NOW = new Date(2026, 8, 16, 10, 0, 0, 0);
@@ -18,6 +19,7 @@ const ENTER_KEY = 'Enter';
 const WEEKDAY_COUNT = 7;
 const SEPTEMBER_CELL_COUNT = 35;
 const DATE_FIELD_COUNT = 2;
+const START_VIEW_TRANSITION = 'startViewTransition';
 
 const SELECTORS = {
   FIELD: '[data-date-field]',
@@ -101,6 +103,7 @@ describe('DatePicker', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('renders the month of the selected value with weekdays, markers and disabled days before the minimum', () => {
@@ -144,6 +147,28 @@ describe('DatePicker', () => {
     query<HTMLButtonElement>(fixture.popover, SELECTORS.PREVIOUS).click();
     query<HTMLButtonElement>(fixture.popover, SELECTORS.PREVIOUS).click();
     expect(title(fixture.popover)).toBe(TITLES.AUGUST);
+  });
+
+  it('slides the month grid with a picker specific view transition direction', () => {
+    const fixture = createFixture();
+    openPicker(fixture);
+    const directions: (string | undefined)[] = [];
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false } as MediaQueryList);
+    Object.defineProperty(document, START_VIEW_TRANSITION, {
+      value: vi.fn((update: () => void) => {
+        directions.push(document.documentElement.dataset[TRANSITION_DATASET_KEY]);
+        update();
+        return { finished: Promise.resolve() };
+      }),
+      configurable: true
+    });
+
+    query<HTMLButtonElement>(fixture.popover, SELECTORS.NEXT).click();
+    query<HTMLButtonElement>(fixture.popover, SELECTORS.PREVIOUS).click();
+
+    expect(directions).toEqual([TRANSITION_DIRECTIONS.PICKER_FORWARD, TRANSITION_DIRECTIONS.PICKER_BACKWARD]);
+    expect(title(fixture.popover)).toBe(TITLES.SEPTEMBER);
+    Reflect.deleteProperty(document, START_VIEW_TRANSITION);
   });
 
   it('selects a day, notifies the input, closes the popover and refocuses the trigger', () => {
