@@ -8,6 +8,7 @@ import {
   expectContinuation,
   fetchEventsBetween,
   freezeClock,
+  removeAttribute,
   seedEvents
 } from './support/calendarViewHelpers';
 import { openSettings, SETTINGS_SELECTORS } from './support/settingsDialogActions';
@@ -34,6 +35,10 @@ const SELECTORS = {
   TIME: '[data-dialog-time]',
   END_TIME: '[data-dialog-end-time]',
   END_DATE: '[data-dialog-end-date]',
+  END_DATE_FIELD: '[data-dialog-end-date-field]',
+  END_DATE_TRIGGER: '[data-dialog-end-date-field] [data-date-picker-trigger]',
+  END_DATE_PICKER: '#endDatePicker',
+  MULTI_DAY: '[data-dialog-multi-day]',
   RECURRENCE: '[data-dialog-recurrence]',
   RECURRENCE_DETAILS: '[data-dialog-recurrence-details]',
   INTERVAL: '[data-dialog-interval]',
@@ -94,6 +99,23 @@ const DATES = {
 } as const;
 
 const SEGMENT_LABELS = { FROM_AFTERNOON: 'ab 14:00', UNTIL_MORNING: 'bis 10:00' } as const;
+
+const PICKER = {
+  TITLE: '.date-picker__title',
+  PREVIOUS: '[aria-label="Vorheriger Monat"]',
+  NEXT: '[aria-label="Nächster Monat"]',
+  CLEAR: '.date-picker__action:has-text("Löschen")',
+  TODAY: '.date-picker__action:has-text("Heute")',
+  SELECTED_CLASS: /date-picker__day--selected/,
+  TODAY_CLASS: /date-picker__day--today/,
+  DAY_BEFORE_TODAY: '2026-09-15',
+  SEPTEMBER: 'September 2026',
+  OCTOBER: 'Oktober 2026'
+} as const;
+
+function pickerDay(picker: Locator, isoDate: string): Locator {
+  return picker.locator('.date-picker__day[data-date="' + isoDate + '"]');
+}
 const EMPTY_INTERVAL = '';
 const DEFAULT_INTERVAL = '1';
 const BIWEEKLY_INTERVAL = '2';
@@ -331,8 +353,11 @@ test.describe('multi day and recurring events', () => {
   test('creates a timed multi day event with a pill on every covered day', async ({ calendar: { page } }) => {
     await openCreateDialogOnFrozenDay(page);
     await expect(page.locator(SELECTORS.END_DATE)).toHaveAttribute('min', TODAY_ISO);
+    await expect(page.locator(SELECTORS.END_DATE_FIELD)).toBeHidden();
     await page.locator(SELECTORS.TITLE).fill(MULTI_DAY.TIMED_TITLE);
     await page.locator(SELECTORS.TIME).fill(MULTI_DAY.START);
+    await page.locator(SELECTORS.MULTI_DAY).check();
+    await expect(page.locator(SELECTORS.END_DATE_FIELD)).toBeVisible();
     await page.locator(SELECTORS.END_DATE).fill(DATES.FRIDAY);
     await page.locator(SELECTORS.END_TIME).fill(MULTI_DAY.END);
     await submitDialog(page);
@@ -346,14 +371,66 @@ test.describe('multi day and recurring events', () => {
     expect(stored).toMatchObject({ date: TODAY_ISO, endDate: DATES.FRIDAY, time: MULTI_DAY.START, endTime: MULTI_DAY.END, recurrence: null });
 
     await pillOn(page, DATES.THURSDAY, MULTI_DAY.TIMED_TITLE).click();
+    await expect(page.locator(SELECTORS.MULTI_DAY)).toBeChecked();
     await expect(page.locator(SELECTORS.END_DATE)).toHaveValue(DATES.FRIDAY);
     await expect(page.locator(SELECTORS.RECURRENCE_DETAILS)).toBeHidden();
+
+    await page.locator(SELECTORS.MULTI_DAY).uncheck();
+    await expect(page.locator(SELECTORS.END_DATE_FIELD)).toBeHidden();
+    await submitDialog(page);
+    await expect(pillOn(page, DATES.THURSDAY, MULTI_DAY.TIMED_TITLE)).toHaveCount(0);
+    const [singleDay] = await fetchEventsBetween(page, TODAY_ISO, TODAY_ISO);
+    expect(singleDay.endDate).toBeNull();
+  });
+
+  test('picks the end date from the custom date picker', async ({ calendar: { page } }) => {
+    await openCreateDialogOnFrozenDay(page);
+    await page.locator(SELECTORS.MULTI_DAY).check();
+    const trigger = page.locator(SELECTORS.END_DATE_TRIGGER);
+    const picker = page.locator(SELECTORS.END_DATE_PICKER);
+
+    await trigger.click();
+    await expect(picker).toBeVisible();
+    await expect(picker.locator(PICKER.TITLE)).toHaveText(PICKER.SEPTEMBER);
+    await expect(pickerDay(picker, TODAY_ISO)).toHaveClass(PICKER.TODAY_CLASS);
+    await expect(pickerDay(picker, PICKER.DAY_BEFORE_TODAY)).toBeDisabled();
+    await picker.locator(PICKER.NEXT).click();
+    await expect(picker.locator(PICKER.TITLE)).toHaveText(PICKER.OCTOBER);
+    await picker.locator(PICKER.PREVIOUS).click();
+    await expect(picker.locator(PICKER.TITLE)).toHaveText(PICKER.SEPTEMBER);
+    await pickerDay(picker, DATES.FRIDAY).click();
+    await expect(picker).toBeHidden();
+    await expect(page.locator(SELECTORS.END_DATE)).toHaveValue(DATES.FRIDAY);
+
+    await trigger.click();
+    await expect(pickerDay(picker, DATES.FRIDAY)).toHaveClass(PICKER.SELECTED_CLASS);
+    await page.keyboard.press(TAB_KEY);
+    await expect(picker).toBeVisible();
+    await page.keyboard.press(ESCAPE_KEY);
+    await expect(picker).toBeHidden();
+    await expect(page.locator(SELECTORS.OVERLAY)).toBeVisible();
+    await expect(trigger).toBeFocused();
+
+    await trigger.click();
+    await picker.locator(PICKER.TODAY).click();
+    await expect(page.locator(SELECTORS.END_DATE)).toHaveValue(TODAY_ISO);
+
+    await trigger.click();
+    await picker.locator(PICKER.CLEAR).click();
+    await expect(page.locator(SELECTORS.END_DATE)).toHaveValue(NO_VALUE);
+
+    await removeAttribute(page.locator(SELECTORS.END_DATE), 'min');
+    await trigger.click();
+    await expect(picker.locator(PICKER.TITLE)).toHaveText(PICKER.SEPTEMBER);
+    await expect(pickerDay(picker, PICKER.DAY_BEFORE_TODAY)).toBeEnabled();
+    await page.keyboard.press(ESCAPE_KEY);
   });
 
   test('creates an all day multi day event', async ({ calendar: { page } }) => {
     await openCreateDialogOnFrozenDay(page);
     await page.locator(SELECTORS.TITLE).fill(MULTI_DAY.ALL_DAY_TITLE);
     await page.locator(SELECTORS.ALL_DAY).check();
+    await page.locator(SELECTORS.MULTI_DAY).check();
     await page.locator(SELECTORS.END_DATE).fill(DATES.THURSDAY);
     await submitDialog(page);
 

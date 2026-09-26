@@ -66,34 +66,60 @@
         </label>
       </div>
 
-      <label class="checkbox">
-        <input class="checkbox__input" type="checkbox" data-dialog-all-day>
-        <span class="checkbox__label">Ganztägig</span>
-      </label>
+      <div class="checkbox-row">
+        <label class="checkbox">
+          <input class="checkbox__input" type="checkbox" data-dialog-all-day>
+          <span class="checkbox__label">Ganztägig</span>
+        </label>
+        <label class="checkbox">
+          <input class="checkbox__input" type="checkbox" data-dialog-multi-day>
+          <span class="checkbox__label">Mehrtägig</span>
+        </label>
+      </div>
 
-      <label class="field">
-        <span class="field__label">Enddatum (optional, für mehrtägige Termine)</span>
-        <input class="field__input" type="date" data-dialog-end-date>
-      </label>
+      <div class="reveal" data-dialog-end-date-field hidden>
+        <div class="reveal__content">
+          <div class="field">
+            <label class="field__label" for="eventEndDate">Enddatum</label>
+            <div class="date-field" data-date-field>
+              <input class="field__input field__input--date" id="eventEndDate" type="date" data-dialog-end-date>
+              <button type="button" class="date-field__trigger" popovertarget="endDatePicker" data-date-picker-trigger aria-label="Datum wählen" title="Datum wählen">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+              </button>
+              <div class="date-picker" id="endDatePicker" popover data-date-picker></div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <label class="field">
         <span class="field__label">Wiederholung</span>
         <select class="field__input field__input--select" data-dialog-recurrence></select>
       </label>
 
-      <div class="field-row" data-dialog-recurrence-details hidden>
-        <label class="field">
-          <span class="field__label">Alle</span>
-          <span class="field__inline">
-            <input class="field__input field__input--number" type="number" min="1" max="365" step="1" value="1" data-dialog-interval>
-            <span class="field__unit" data-dialog-interval-unit></span>
-          </span>
-        </label>
+      <div class="reveal" data-dialog-recurrence-details hidden>
+        <div class="reveal__content">
+          <div class="field-row">
+            <label class="field">
+              <span class="field__label">Alle</span>
+              <span class="field__inline">
+                <input class="field__input field__input--number" type="number" min="1" max="365" step="1" value="1" data-dialog-interval>
+                <span class="field__unit" data-dialog-interval-unit></span>
+              </span>
+            </label>
 
-        <label class="field">
-          <span class="field__label">Endet am (optional)</span>
-          <input class="field__input" type="date" data-dialog-until>
-        </label>
+            <div class="field">
+              <label class="field__label" for="eventUntil">Endet am (optional)</label>
+              <div class="date-field" data-date-field>
+                <input class="field__input field__input--date" id="eventUntil" type="date" data-dialog-until>
+                <button type="button" class="date-field__trigger" popovertarget="untilDatePicker" data-date-picker-trigger aria-label="Datum wählen" title="Datum wählen">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                </button>
+                <div class="date-picker" id="untilDatePicker" popover data-date-picker></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="field" role="radiogroup" aria-label="Farbe">

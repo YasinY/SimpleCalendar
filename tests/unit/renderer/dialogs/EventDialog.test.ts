@@ -52,7 +52,10 @@ const SELECTORS = {
   TIME_INPUT: '[data-dialog-time]',
   END_TIME_INPUT: '[data-dialog-end-time]',
   END_DATE_INPUT: '[data-dialog-end-date]',
+  END_DATE_FIELD: '[data-dialog-end-date-field]',
   ALL_DAY_INPUT: '[data-dialog-all-day]',
+  MULTI_DAY_INPUT: '[data-dialog-multi-day]',
+  DATE_PICKER: '[data-date-picker]',
   RECURRENCE_SELECT: '[data-dialog-recurrence]',
   RECURRENCE_DETAILS: '[data-dialog-recurrence-details]',
   INTERVAL_INPUT: '[data-dialog-interval]',
@@ -76,7 +79,9 @@ interface DialogFixture {
   timeInput: HTMLInputElement;
   endTimeInput: HTMLInputElement;
   endDateInput: HTMLInputElement;
+  endDateField: HTMLElement;
   allDayInput: HTMLInputElement;
+  multiDayInput: HTMLInputElement;
   recurrenceSelect: HTMLSelectElement;
   recurrenceDetails: HTMLElement;
   intervalInput: HTMLInputElement;
@@ -110,7 +115,9 @@ function createFixture(): DialogFixture {
     timeInput: query(overlay, SELECTORS.TIME_INPUT),
     endTimeInput: query(overlay, SELECTORS.END_TIME_INPUT),
     endDateInput: query(overlay, SELECTORS.END_DATE_INPUT),
+    endDateField: query(overlay, SELECTORS.END_DATE_FIELD),
     allDayInput: query(overlay, SELECTORS.ALL_DAY_INPUT),
+    multiDayInput: query(overlay, SELECTORS.MULTI_DAY_INPUT),
     recurrenceSelect: query(overlay, SELECTORS.RECURRENCE_SELECT),
     recurrenceDetails: query(overlay, SELECTORS.RECURRENCE_DETAILS),
     intervalInput: query(overlay, SELECTORS.INTERVAL_INPUT),
@@ -163,7 +170,9 @@ describe('EventDialog', () => {
     expect(fixture.endTimeInput.value).toBe(NO_END_TIME);
     expect(fixture.endDateInput.value).toBe(NO_DATE);
     expect(fixture.endDateInput.min).toBe(ISO_DATE);
+    expect(fixture.endDateField.hidden).toBe(true);
     expect(fixture.allDayInput.checked).toBe(false);
+    expect(fixture.multiDayInput.checked).toBe(false);
     expect(fixture.recurrenceSelect.value).toBe(RECURRENCE_NONE_VALUE);
     expect(fixture.recurrenceDetails.hidden).toBe(true);
     expect(fixture.intervalInput.value).toBe(DEFAULT_INTERVAL_VALUE);
@@ -206,6 +215,8 @@ describe('EventDialog', () => {
     expect(fixture.endTimeInput.value).toBe(END_TIME);
     expect(fixture.endDateInput.value).toBe(END_DATE);
     expect(fixture.endDateInput.min).toBe(event.date);
+    expect(fixture.multiDayInput.checked).toBe(true);
+    expect(fixture.endDateField.hidden).toBe(false);
     expect(fixture.recurrenceSelect.value).toBe(MONTHLY_RECURRENCE.frequency);
     expect(fixture.recurrenceDetails.hidden).toBe(false);
     expect(fixture.intervalInput.value).toBe(String(INTERVAL));
@@ -225,6 +236,8 @@ describe('EventDialog', () => {
 
     expect(fixture.endTimeInput.value).toBe(NO_END_TIME);
     expect(fixture.endDateInput.value).toBe(NO_DATE);
+    expect(fixture.multiDayInput.checked).toBe(false);
+    expect(fixture.endDateField.hidden).toBe(true);
     expect(fixture.recurrenceSelect.value).toBe(RECURRENCE_NONE_VALUE);
     expect(fixture.recurrenceDetails.hidden).toBe(true);
     expect(fixture.allDayInput.checked).toBe(true);
@@ -325,6 +338,43 @@ describe('EventDialog', () => {
     fixture.dialog.openForEvent(event);
     fixture.deleteButton.click();
     expect(fixture.onDelete).toHaveBeenCalledExactlyOnceWith(event);
+  });
+
+  it('reveals the end date once multi day is checked and drops it again when unchecked', () => {
+    const fixture = createFixture();
+    fixture.dialog.openForDate(ISO_DATE);
+
+    fixture.multiDayInput.checked = true;
+    fixture.multiDayInput.dispatchEvent(new Event(CHANGE_EVENT));
+    fixture.endDateInput.value = END_DATE;
+
+    expect(fixture.endDateField.hidden).toBe(false);
+    expect(submit(fixture).endDate).toBe(END_DATE);
+
+    fixture.multiDayInput.checked = false;
+    fixture.multiDayInput.dispatchEvent(new Event(CHANGE_EVENT));
+
+    expect(fixture.endDateField.hidden).toBe(true);
+    expect(submit(fixture).endDate).toBeNull();
+  });
+
+  it('submits no end date when multi day is checked without a date', () => {
+    const fixture = createFixture();
+    fixture.dialog.openForDate(ISO_DATE);
+    fixture.multiDayInput.checked = true;
+
+    expect(submit(fixture).endDate).toBeNull();
+  });
+
+  it('attaches a date picker to the end date and until fields', () => {
+    const fixture = createFixture();
+    const [endDatePicker, untilPicker] = fixture.overlay.querySelectorAll<HTMLElement>(SELECTORS.DATE_PICKER);
+
+    endDatePicker.dispatchEvent(Object.assign(new Event('toggle'), { newState: 'open' }));
+    untilPicker.dispatchEvent(Object.assign(new Event('toggle'), { newState: 'open' }));
+
+    expect(endDatePicker.childElementCount).toBeGreaterThan(0);
+    expect(untilPicker.childElementCount).toBeGreaterThan(0);
   });
 
   it('toggles the time inputs when all day changes', () => {

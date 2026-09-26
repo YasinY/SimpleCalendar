@@ -16,6 +16,7 @@ import { requireElement } from '@renderer/dom/elements';
 import { fillSelect } from '@renderer/dom/selectOptions';
 import { DEFAULT_EVENT_COLOR, resolveEventColor } from '@renderer/events/eventColors';
 import { buildColorSwatches } from './colorSwatches';
+import { attachDatePickers } from './datePicker/attachDatePickers';
 import { DialogOverlay } from './DialogOverlay';
 import type { DiscardPrompt } from './DiscardPrompt';
 import {
@@ -42,7 +43,9 @@ const SELECTORS = {
   TIME_INPUT: '[data-dialog-time]',
   END_TIME_INPUT: '[data-dialog-end-time]',
   END_DATE_INPUT: '[data-dialog-end-date]',
+  END_DATE_FIELD: '[data-dialog-end-date-field]',
   ALL_DAY_INPUT: '[data-dialog-all-day]',
+  MULTI_DAY_INPUT: '[data-dialog-multi-day]',
   RECURRENCE_SELECT: '[data-dialog-recurrence]',
   RECURRENCE_DETAILS: '[data-dialog-recurrence-details]',
   INTERVAL_INPUT: '[data-dialog-interval]',
@@ -70,7 +73,9 @@ export class EventDialog implements EventEditor {
   readonly #timeInput: HTMLInputElement;
   readonly #endTimeInput: HTMLInputElement;
   readonly #endDateInput: HTMLInputElement;
+  readonly #endDateField: HTMLElement;
   readonly #allDayInput: HTMLInputElement;
+  readonly #multiDayInput: HTMLInputElement;
   readonly #recurrenceSelect: HTMLSelectElement;
   readonly #recurrenceDetails: HTMLElement;
   readonly #intervalInput: HTMLInputElement;
@@ -98,7 +103,9 @@ export class EventDialog implements EventEditor {
     this.#timeInput = requireElement(overlayElement, SELECTORS.TIME_INPUT);
     this.#endTimeInput = requireElement(overlayElement, SELECTORS.END_TIME_INPUT);
     this.#endDateInput = requireElement(overlayElement, SELECTORS.END_DATE_INPUT);
+    this.#endDateField = requireElement(overlayElement, SELECTORS.END_DATE_FIELD);
     this.#allDayInput = requireElement(overlayElement, SELECTORS.ALL_DAY_INPUT);
+    this.#multiDayInput = requireElement(overlayElement, SELECTORS.MULTI_DAY_INPUT);
     this.#recurrenceSelect = requireElement(overlayElement, SELECTORS.RECURRENCE_SELECT);
     this.#recurrenceDetails = requireElement(overlayElement, SELECTORS.RECURRENCE_DETAILS);
     this.#intervalInput = requireElement(overlayElement, SELECTORS.INTERVAL_INPUT);
@@ -113,6 +120,7 @@ export class EventDialog implements EventEditor {
     fillSelect(this.#reminderSelect, REMINDER_OPTIONS);
     fillSelect(this.#recurrenceSelect, RECURRENCE_OPTIONS);
     buildColorSwatches(this.#colorGroup);
+    attachDatePickers(overlayElement);
     this.#bindInteractions();
   }
 
@@ -127,6 +135,7 @@ export class EventDialog implements EventEditor {
     this.#endTimeInput.value = NO_END_TIME;
     this.#endDateInput.value = NO_DATE;
     this.#allDayInput.checked = false;
+    this.#multiDayInput.checked = false;
     this.#recurrenceSelect.value = RECURRENCE_NONE_VALUE;
     this.#intervalInput.value = toIntervalValue(null);
     this.#untilInput.value = NO_DATE;
@@ -134,6 +143,7 @@ export class EventDialog implements EventEditor {
     this.#reminderSelect.value = REMINDER_NONE_VALUE;
     this.#selectColor(DEFAULT_EVENT_COLOR);
     this.#applyAllDayState();
+    this.#applyMultiDayState();
     this.#applyRecurrenceState();
     this.#show(isoDate);
   }
@@ -149,6 +159,7 @@ export class EventDialog implements EventEditor {
     this.#endTimeInput.value = event.endTime ?? NO_END_TIME;
     this.#endDateInput.value = event.endDate ?? NO_DATE;
     this.#allDayInput.checked = event.allDay;
+    this.#multiDayInput.checked = event.endDate !== null;
     this.#recurrenceSelect.value = toRecurrenceValue(event.recurrence);
     this.#intervalInput.value = toIntervalValue(event.recurrence);
     this.#untilInput.value = toUntilValue(event.recurrence);
@@ -156,6 +167,7 @@ export class EventDialog implements EventEditor {
     this.#reminderSelect.value = toReminderValue(event.reminderMinutes);
     this.#selectColor(resolveEventColor(event.color));
     this.#applyAllDayState();
+    this.#applyMultiDayState();
     this.#applyRecurrenceState();
     this.#show(event.date);
   }
@@ -180,6 +192,10 @@ export class EventDialog implements EventEditor {
     const allDay = this.#allDayInput.checked;
     this.#timeInput.disabled = allDay;
     this.#endTimeInput.disabled = allDay;
+  }
+
+  #applyMultiDayState(): void {
+    this.#endDateField.hidden = !this.#multiDayInput.checked;
   }
 
   #applyRecurrenceState(): void {
@@ -210,16 +226,18 @@ export class EventDialog implements EventEditor {
     });
 
     this.#allDayInput.addEventListener('change', () => this.#applyAllDayState());
+    this.#multiDayInput.addEventListener('change', () => this.#applyMultiDayState());
     this.#recurrenceSelect.addEventListener('change', () => this.#applyRecurrenceState());
   }
 
   #collectPayload(): EventInput {
     const allDay = this.#allDayInput.checked;
+    const multiDay = this.#multiDayInput.checked;
     return {
       id: this.#activeEvent?.id ?? null,
       occurrenceDate: this.#activeEvent?.date ?? null,
       date: this.#activeDate ?? EMPTY_TITLE,
-      endDate: toOptionalDate(this.#endDateInput.value),
+      endDate: multiDay ? toOptionalDate(this.#endDateInput.value) : null,
       time: allDay ? ALL_DAY_TIME : this.#timeInput.value,
       endTime: allDay ? null : toEndTime(this.#endTimeInput.value),
       allDay,
