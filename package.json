@@ -23,6 +23,7 @@
     "check": "npm run typecheck && npm run test:coverage && npm run test:e2e",
     "dist": "npm run build && electron-builder --win --publish never",
     "generate-tray-icon": "node scripts/generateTrayIcon.js",
+    "generate-app-icon": "electron scripts/renderAppIcon.cjs",
     "db:generate": "drizzle-kit generate"
   },
   "build": {
@@ -35,6 +36,7 @@
       "package.json"
     ],
     "win": {
+      "icon": "assets/icon.png",
       "target": [
         "nsis"
       ]

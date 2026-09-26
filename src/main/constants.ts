@@ -19,18 +19,20 @@ export const MILLISECONDS_PER_MINUTE = 60000;
 export const MINUTES_PER_DAY = 1440;
 export const REMINDER_CHECK_INTERVAL_MS = 30000;
 
+export const PRELOAD_PATH = path.join(__dirname, 'preload.js');
+export const RENDERER_ENTRY_PATH = path.join(__dirname, '..', 'renderer', 'index.html');
+export const TRAY_ICON_PATH = path.join(__dirname, '..', '..', 'assets', 'trayIcon.png');
+export const APP_ICON_PATH = path.join(__dirname, '..', '..', 'assets', 'icon.png');
+
 export const WINDOW_OPTIONS: BrowserWindowConstructorOptions = {
   width: 1218,
   height: 780,
   minWidth: 1218,
   minHeight: 620,
   show: false,
-  titleBarStyle: 'hidden'
+  titleBarStyle: 'hidden',
+  icon: APP_ICON_PATH
 };
-
-export const PRELOAD_PATH = path.join(__dirname, 'preload.js');
-export const RENDERER_ENTRY_PATH = path.join(__dirname, '..', 'renderer', 'index.html');
-export const TRAY_ICON_PATH = path.join(__dirname, '..', '..', 'assets', 'trayIcon.png');
 export const MIGRATIONS_PATH = path.join(__dirname, '..', '..', 'drizzle');
 
 export const TRAY_TOOLTIP = 'SimpleCalendar';

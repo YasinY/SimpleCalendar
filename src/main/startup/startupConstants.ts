@@ -1,5 +1,6 @@
 import path from 'node:path';
 import type { BrowserWindowConstructorOptions } from 'electron';
+import { APP_ICON_PATH } from '@main/constants';
 
 export const SPLASH_MINIMUM_DURATION_MS = 1800;
 export const SPLASH_MINIMUM_DURATION_ENV_VARIABLE = 'SIMPLECALENDAR_SPLASH_MINIMUM_MS';
@@ -20,5 +21,6 @@ export const SPLASH_WINDOW_OPTIONS: BrowserWindowConstructorOptions = {
   skipTaskbar: true,
   alwaysOnTop: true,
   center: true,
-  show: false
+  show: false,
+  icon: APP_ICON_PATH
 };
