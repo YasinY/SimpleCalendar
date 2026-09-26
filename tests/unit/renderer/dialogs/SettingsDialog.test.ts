@@ -13,6 +13,8 @@ const DISCARD_OVERLAY_ID = 'discardOverlay';
 const REGION = 'HH';
 const CITY = 'Hamburg';
 const PADDED_CITY = '  ' + CITY + '  ';
+const APP_VERSION = '1.2.3';
+const VERSION_TEXT = 'SimpleCalendar ' + APP_VERSION;
 
 const SELECTORS = {
   FORM: '[data-settings-form]',
@@ -20,6 +22,7 @@ const SELECTORS = {
   THEME_SELECT: '[data-settings-theme]',
   CITY_INPUT: '[data-settings-city]',
   AUTO_UPDATE_INPUT: '[data-settings-auto-update]',
+  VERSION_LABEL: '[data-settings-version]',
   CANCEL_BUTTON: '[data-settings-cancel]'
 } as const;
 
@@ -108,6 +111,14 @@ describe('SettingsDialog', () => {
 
     expect(submitEvent.defaultPrevented).toBe(true);
     expect(onSave).toHaveBeenCalledExactlyOnceWith({ holidayRegion: REGION, theme: THEMES.DARK, weatherCity: CITY, autoUpdate: true });
+  });
+
+  it('shows the app version in the footer', () => {
+    const { dialog, overlay } = createFixture();
+
+    dialog.showVersion(APP_VERSION);
+
+    expect(query<HTMLElement>(overlay, SELECTORS.VERSION_LABEL).textContent).toBe(VERSION_TEXT);
   });
 
   it('hides the overlay on close', () => {

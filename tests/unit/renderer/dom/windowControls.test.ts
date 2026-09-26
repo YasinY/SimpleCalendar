@@ -13,6 +13,7 @@ function createApiMock(): CalendarApi {
     deleteOccurrence: vi.fn(),
     getSettings: vi.fn(),
     updateSettings: vi.fn(),
+    getAppVersion: vi.fn(),
     minimizeWindow: vi.fn(),
     toggleMaximizeWindow: vi.fn(),
     hideWindow: vi.fn()

@@ -4,11 +4,15 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import { DEFAULT_LAUNCH_OPTIONS, expect, test } from './support/calendarFixture';
 import { openSettings, saveSettings, SETTINGS_SELECTORS } from './support/settingsDialogActions';
 import { DEFAULT_COORDINATES, mockForecast, mockGeocoding } from './support/weatherRoutes';
+import { PROJECT_ROOT } from './support/coveragePaths';
 import type { Settings } from '@shared/settings';
 import type { Theme } from '@shared/theme';
 
 const SETTINGS_FILE_NAME = 'settings.json';
+const PACKAGE_FILE_NAME = 'package.json';
 const FILE_ENCODING = 'utf8';
+const VERSION_PREFIX = 'SimpleCalendar ';
+const packageVersion = (JSON.parse(readFileSync(path.join(PROJECT_ROOT, PACKAGE_FILE_NAME), FILE_ENCODING)) as { version: string }).version;
 const WEATHER_BADGE = '#weatherBadge';
 const HOLIDAY_REGION = 'BY';
 const NATIONWIDE_REGION = '';
@@ -127,4 +131,9 @@ test.describe('with a configured city', () => {
     await expect.poll(() => readStoredSettings(userData).weatherCity).toBe(EMPTY_CITY);
     await expectDialogValues(page, { region: HOLIDAY_REGION, theme: THEMES.DARK, city: EMPTY_CITY });
   });
+});
+
+test('shows the app version in the settings dialog', async ({ calendar: { page } }) => {
+  await openSettings(page);
+  await expect(page.locator(SETTINGS_SELECTORS.VERSION)).toHaveText(VERSION_PREFIX + packageVersion);
 });

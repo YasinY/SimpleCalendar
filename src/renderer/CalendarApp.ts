@@ -87,6 +87,7 @@ export class CalendarApp {
   }
 
   async start(): Promise<void> {
+    void this.#api.getAppVersion().then((version) => this.#settingsDialog.showVersion(version));
     this.#settings = await this.#api.getSettings();
     this.#viewMode = resolveViewMode(this.#settings.viewMode);
     this.#viewDate = this.#config.normalize(new Date());

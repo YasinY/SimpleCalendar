@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; font-src 'self'">
+  <title>SimpleCalendar</title>
+  <link rel="stylesheet" href="splash.css">
+</head>
+<body>
+  <main class="splash">
+    <svg class="logo logo--assembling" id="logo" viewBox="0 0 32 32" role="img" aria-label="SimpleCalendar">
+      <g class="logo__block logo__block--page"><rect class="logo__shape logo__page" x="3" y="5" width="25" height="23" rx="3"/></g>
+      <g class="logo__block logo__block--header"><path class="logo__shape logo__header" d="M3 8a3 3 0 0 1 3-3h19a3 3 0 0 1 3 3v4H3z"/></g>
+      <g class="logo__block logo__block--ring-left"><rect class="logo__shape logo__ring" x="8" y="2" width="3" height="4" rx="1"/></g>
+      <g class="logo__block logo__block--ring-right"><rect class="logo__shape logo__ring" x="20" y="2" width="3" height="4" rx="1"/></g>
+      <g class="logo__block logo__block--mark-top"><rect class="logo__shape logo__mark" x="9" y="16" width="13" height="3" rx="1"/></g>
+      <g class="logo__block logo__block--mark-bottom"><rect class="logo__shape logo__mark" x="9" y="21" width="13" height="3" rx="1"/></g>
+    </svg>
+    <h1 class="splash__title">SimpleCalendar</h1>
+    <p class="splash__status" id="statusText"></p>
+    <div class="progress" id="progress" hidden>
+      <div class="progress__bar" id="progressBar"></div>
+    </div>
+    <p class="splash__version" id="versionLabel"></p>
+  </main>
+  <script type="module" src="splash.js"></script>
+</body>
+</html>

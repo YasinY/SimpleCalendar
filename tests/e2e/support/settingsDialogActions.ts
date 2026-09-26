@@ -8,6 +8,7 @@ export const SETTINGS_SELECTORS = {
   THEME: '[data-settings-theme]',
   CITY: '[data-settings-city]',
   AUTO_UPDATE: '[data-settings-auto-update]',
+  VERSION: '[data-settings-version]',
   CANCEL: '[data-settings-cancel]',
   SUBMIT: '#settingsOverlay button[type="submit"]'
 } as const;

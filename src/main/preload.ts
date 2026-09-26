@@ -18,6 +18,7 @@ const calendarApi: CalendarApi = {
   deleteOccurrence: (ref: OccurrenceRef) => ipcRenderer.invoke(IPC_CHANNELS.DELETE_OCCURRENCE, ref),
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.GET_SETTINGS),
   updateSettings: (patch: Partial<Settings>) => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_SETTINGS, patch),
+  getAppVersion: () => ipcRenderer.invoke(IPC_CHANNELS.GET_APP_VERSION),
   minimizeWindow: notifyMain(IPC_CHANNELS.WINDOW_MINIMIZE),
   toggleMaximizeWindow: notifyMain(IPC_CHANNELS.WINDOW_TOGGLE_MAXIMIZE),
   hideWindow: notifyMain(IPC_CHANNELS.WINDOW_HIDE)

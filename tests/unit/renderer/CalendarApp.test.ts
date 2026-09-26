@@ -19,6 +19,7 @@ import {
   createCalendarApiMock,
   createCalendarAppDoubles,
   createCalendarElements,
+  FAKE_APP_VERSION,
   type CalendarApiMock,
   type CalendarAppDoubles
 } from '@tests/support/calendarAppDoubles';
@@ -473,6 +474,12 @@ describe('CalendarApp', () => {
   });
 
   describe('settings', () => {
+    it('shows the app version in the settings dialog', async () => {
+      await startApp();
+      expect(api.getAppVersion).toHaveBeenCalledOnce();
+      expect(doubles.settingsDialog.showVersion).toHaveBeenCalledExactlyOnceWith(FAKE_APP_VERSION);
+    });
+
     it('opens the settings dialog with the loaded settings', async () => {
       await startApp();
       const loadedSettings = await api.getSettings.mock.results[0].value;

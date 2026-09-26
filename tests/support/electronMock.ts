@@ -19,10 +19,17 @@ export const themeListeners: ListenerMap = new Map();
 export class FakeBrowserWindow {
   static readonly instances: FakeBrowserWindow[] = [];
   readonly options: unknown;
-  readonly webContents = { on: createRegistrar(webContentsListeners), once: createRegistrar(webContentsListeners) };
+  readonly webContents = {
+    on: createRegistrar(webContentsListeners),
+    once: createRegistrar(webContentsListeners),
+    send: vi.fn()
+  };
   readonly removeMenu = vi.fn();
   readonly loadFile = vi.fn(() => Promise.resolve());
   readonly on = createRegistrar(windowListeners);
+  readonly once = createRegistrar(windowListeners);
+  readonly isDestroyed = vi.fn(() => false);
+  readonly close = vi.fn();
   readonly hide = vi.fn();
   readonly show = vi.fn();
   readonly focus = vi.fn();
@@ -53,8 +60,11 @@ export class FakeNotification {
 
 let resolveReady: () => void = () => {};
 
+export const FAKE_APP_VERSION = '9.9.9';
+
 export const fakeApp = {
   isPackaged: false,
+  getVersion: vi.fn(() => FAKE_APP_VERSION),
   requestSingleInstanceLock: vi.fn(() => true),
   quit: vi.fn(),
   on: createRegistrar(appListeners),

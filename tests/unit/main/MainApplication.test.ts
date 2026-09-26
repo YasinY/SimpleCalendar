@@ -6,10 +6,12 @@ import { IPC_CHANNELS } from '@shared/ipcChannels';
 import { DEFAULT_SETTINGS } from '@shared/settingsDefaults';
 import type { CalendarStorage } from '@main/storage/calendarStorage';
 import type { TrayManager } from '@main/tray/TrayManager';
-import type { UpdateService } from '@main/updates/UpdateService';
+import type { StartupSequence } from '@main/startup/StartupSequence';
+import type { StartupOptions } from '@main/startup/startupOptions';
 import type { Settings } from '@shared/settings';
 import { createCalendarEvent } from '@tests/support/calendarEventFactory';
 import {
+  FAKE_APP_VERSION,
   FakeBrowserWindow,
   FakeNotification,
   appListeners,
@@ -58,6 +60,7 @@ const DARK_THEME_PATCH: Partial<Settings> = { theme: 'dark' };
 const DUE_EVENT = createCalendarEvent({ date: TODAY, time: '09:00', reminderMinutes: 0, notified: false });
 const DUE_EVENT_BODY = '16.09.2026 um 09:00 Uhr';
 const FIRST_INDEX = 0;
+const STARTUP_NOT_RUN = 'startup was not run';
 
 type StorageStub = ReturnType<typeof createStorageStub>;
 
@@ -89,8 +92,24 @@ function createTrayStub() {
   };
 }
 
-function createUpdateServiceStub() {
-  return { start: vi.fn() };
+function createStartupStub() {
+  let captured: StartupOptions | undefined;
+  let loaded: Promise<void> | undefined;
+  return {
+    run: vi.fn((options: StartupOptions) => {
+      captured = options;
+      loaded = options.openMainWindow();
+      return loaded;
+    }),
+    options: (): StartupOptions => {
+      if (!captured) throw new Error(STARTUP_NOT_RUN);
+      return captured;
+    },
+    loaded: (): Promise<void> => {
+      if (!loaded) throw new Error(STARTUP_NOT_RUN);
+      return loaded;
+    }
+  };
 }
 
 function flushPromises(): Promise<void> {
@@ -104,7 +123,7 @@ function mainWindow(): FakeBrowserWindow {
 const originalArgv = process.argv;
 let storage: StorageStub;
 let tray: ReturnType<typeof createTrayStub>;
-let updateService: ReturnType<typeof createUpdateServiceStub>;
+let startup: ReturnType<typeof createStartupStub>;
 let application: MainApplication;
 
 async function startApplication(): Promise<void> {
@@ -122,8 +141,8 @@ beforeEach(() => {
   storage = createStorageStub();
   vi.mocked(openStorage).mockReturnValue(storage as unknown as CalendarStorage);
   tray = createTrayStub();
-  updateService = createUpdateServiceStub();
-  application = new MainApplication(tray as unknown as TrayManager, updateService as unknown as UpdateService);
+  startup = createStartupStub();
+  application = new MainApplication(tray as unknown as TrayManager, startup as unknown as StartupSequence);
 });
 
 afterEach(() => {
@@ -236,19 +255,37 @@ describe('MainApplication', () => {
       expect(mainWindow().setBackgroundColor).not.toHaveBeenCalled();
     });
 
-    it('starts the update service when automatic updates are enabled', async () => {
+    it('runs the startup sequence with automatic updates and the window background', async () => {
       await startApplication();
 
       expect(storage.settings.getAll).toHaveBeenCalledTimes(1);
-      expect(updateService.start).toHaveBeenCalledTimes(1);
+      expect(startup.run).toHaveBeenCalledTimes(1);
+      expect(startup.options()).toMatchObject({ autoUpdate: true, backgroundColor: THEME_BACKGROUNDS.light });
     });
 
-    it('does not start the update service when automatic updates are disabled', async () => {
+    it('runs the startup sequence without an update check when automatic updates are disabled', async () => {
       storage.settings.getAll.mockReturnValue({ ...DEFAULT_SETTINGS, autoUpdate: false });
 
       await startApplication();
 
-      expect(updateService.start).not.toHaveBeenCalled();
+      expect(startup.options()).toMatchObject({ autoUpdate: false });
+    });
+
+    it('creates the main window only when the startup opens it', async () => {
+      startup.run.mockImplementation(() => Promise.resolve());
+
+      await startApplication();
+
+      expect(FakeBrowserWindow.instances).toHaveLength(NO_WINDOWS);
+    });
+
+    it('resolves the opened main window once the renderer finished loading', async () => {
+      await startApplication();
+      const loaded = startup.loaded();
+
+      invokeListener(webContentsListeners, DID_FINISH_LOAD);
+
+      await expect(loaded).resolves.toBeUndefined();
     });
   });
 
@@ -290,6 +327,10 @@ describe('MainApplication', () => {
 
     it('returns the settings', () => {
       expect(invokeListener(ipcHandlers, IPC_CHANNELS.GET_SETTINGS)).toBe(DEFAULT_SETTINGS);
+    });
+
+    it('returns the app version', () => {
+      expect(invokeListener(ipcHandlers, IPC_CHANNELS.GET_APP_VERSION)).toBe(FAKE_APP_VERSION);
     });
 
     it('updates the settings and applies the new theme', () => {
@@ -355,31 +396,33 @@ describe('MainApplication', () => {
   });
 
   describe('window visibility', () => {
-    it('shows and focuses the window after the renderer finished loading', async () => {
+    it('shows and focuses the window once the startup finished', async () => {
       await startApplication();
 
-      invokeListener(webContentsListeners, DID_FINISH_LOAD);
+      startup.options().onFinished();
 
       expect(mainWindow().show).toHaveBeenCalledTimes(1);
       expect(mainWindow().focus).toHaveBeenCalledTimes(1);
       expect(mainWindow().restore).not.toHaveBeenCalled();
     });
 
-    it('starts hidden when launched with the hidden flag', async () => {
+    it('stays hidden after the startup when launched with the hidden flag', async () => {
       process.argv = [...originalArgv, HIDDEN_LAUNCH_FLAG];
-
       await startApplication();
 
-      expect(webContentsListeners.has(DID_FINISH_LOAD)).toBe(false);
+      startup.options().onFinished();
+
+      expect(mainWindow().show).not.toHaveBeenCalled();
       expect(fakeApp.getLoginItemSettings).not.toHaveBeenCalled();
     });
 
-    it('starts hidden when opened at login', async () => {
+    it('stays hidden after the startup when opened at login', async () => {
       fakeApp.getLoginItemSettings.mockReturnValue({ wasOpenedAtLogin: true });
-
       await startApplication();
 
-      expect(webContentsListeners.has(DID_FINISH_LOAD)).toBe(false);
+      startup.options().onFinished();
+
+      expect(mainWindow().show).not.toHaveBeenCalled();
     });
 
     it('restores a minimized window when revealed from the tray', async () => {

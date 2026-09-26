@@ -4,6 +4,7 @@ import path from 'node:path';
 import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
 import type { Menu, Settings as LoginItemSettings, Tray } from 'electron';
 import { MAIN_RAW_COVERAGE_DIR, PROJECT_ROOT } from './coveragePaths';
+import { acquireMainPage, NO_SPLASH_DELAY_MS, SPLASH_MINIMUM_ENV_VARIABLE, waitForSplashClosed } from './splashWindow';
 import type { RunningCalendar } from './runningCalendar';
 
 const USER_DATA_ENV_VARIABLE = 'SIMPLECALENDAR_USER_DATA';
@@ -13,10 +14,12 @@ const USER_DATA_PREFIX = 'simplecalendar-e2e-storage-';
 const HIDDEN_LAUNCH_FLAG = '--hidden';
 const USER_DATA_DIR_SWITCH = '--user-data-dir=';
 const MAIN_PROCESS_HOOKS_PATH = path.join(__dirname, 'mainProcessHooks.cjs').replace(/\\/g, '/');
+const OFFSCREEN_WINDOWS_HOOK_PATH = path.join(__dirname, 'offscreenWindows.cjs').replace(/\\/g, '/');
 
 export interface UserDataLaunchOptions {
   mainProcessHooks: boolean;
   userDataOverride: boolean;
+  splashMinimumMs: number;
 }
 
 export interface MainProcessHookGlobals {
@@ -26,7 +29,11 @@ export interface MainProcessHookGlobals {
   __e2eConsoleMessages: string[];
 }
 
-export const DEFAULT_USER_DATA_LAUNCH_OPTIONS: UserDataLaunchOptions = { mainProcessHooks: false, userDataOverride: true };
+export const DEFAULT_USER_DATA_LAUNCH_OPTIONS: UserDataLaunchOptions = {
+  mainProcessHooks: false,
+  userDataOverride: true,
+  splashMinimumMs: NO_SPLASH_DELAY_MS
+};
 
 export function createUserData(files: Record<string, string>): string {
   const userData = mkdtempSync(path.join(tmpdir(), USER_DATA_PREFIX));
@@ -38,11 +45,12 @@ export function removeUserData(userData: string): void {
   rmSync(userData, { recursive: true, force: true });
 }
 
-export function buildUserDataEnvironment(userData: string): Record<string, string> {
+export function buildUserDataEnvironment(userData: string, splashMinimumMs = NO_SPLASH_DELAY_MS): Record<string, string> {
   return {
     ...(process.env as Record<string, string>),
     [V8_COVERAGE_ENV_VARIABLE]: MAIN_RAW_COVERAGE_DIR,
-    [USER_DATA_ENV_VARIABLE]: userData
+    [USER_DATA_ENV_VARIABLE]: userData,
+    [SPLASH_MINIMUM_ENV_VARIABLE]: String(splashMinimumMs)
   };
 }
 
@@ -51,15 +59,15 @@ function withoutUserDataOverride(environment: Record<string, string>): Record<st
   return rest;
 }
 
-function buildEnvironment(userData: string, { userDataOverride }: UserDataLaunchOptions): Record<string, string> {
-  const environment = buildUserDataEnvironment(userData);
+function buildEnvironment(userData: string, { userDataOverride, splashMinimumMs }: UserDataLaunchOptions): Record<string, string> {
+  const environment = buildUserDataEnvironment(userData, splashMinimumMs);
   return userDataOverride ? environment : withoutUserDataOverride(environment);
 }
 
 function buildArguments(userData: string, { mainProcessHooks, userDataOverride }: UserDataLaunchOptions): string[] {
   const hookArguments = mainProcessHooks ? [REQUIRE_FLAG, MAIN_PROCESS_HOOKS_PATH] : [];
   const userDataArguments = userDataOverride ? [] : [USER_DATA_DIR_SWITCH + userData];
-  return [...hookArguments, PROJECT_ROOT, HIDDEN_LAUNCH_FLAG, ...userDataArguments];
+  return [REQUIRE_FLAG, OFFSCREEN_WINDOWS_HOOK_PATH, ...hookArguments, PROJECT_ROOT, HIDDEN_LAUNCH_FLAG, ...userDataArguments];
 }
 
 export async function launchElectronInUserData(
@@ -78,8 +86,9 @@ export async function launchInUserData(
   options: UserDataLaunchOptions = DEFAULT_USER_DATA_LAUNCH_OPTIONS
 ): Promise<RunningCalendar> {
   const app = await launchElectronInUserData(userData, options);
-  const page: Page = await app.firstWindow();
+  const page: Page = await acquireMainPage(app);
   await page.waitForLoadState('domcontentloaded');
+  await waitForSplashClosed(app);
   return { app, page, userData };
 }
 

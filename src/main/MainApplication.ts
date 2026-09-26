@@ -16,13 +16,15 @@ import { openStorage } from './storage/openStorage';
 import { IPC_CHANNELS } from '@shared/ipcChannels';
 import type { CalendarStorage } from './storage/calendarStorage';
 import type { TrayManager } from './tray/TrayManager';
-import type { UpdateService } from './updates/UpdateService';
+import type { StartupSequence } from './startup/StartupSequence';
 import type { CalendarEvent } from '@shared/calendarEvent';
 import type { DateRange } from '@shared/dateRange';
 import type { EventInput } from '@shared/eventInput';
 import type { OccurrenceRef } from '@shared/occurrenceRef';
 import type { Settings } from '@shared/settings';
 import type { Theme } from '@shared/theme';
+
+const DID_FINISH_LOAD_EVENT = 'did-finish-load';
 
 const WINDOW_CONTROL_ACTIONS: Record<string, (window: BrowserWindow) => void> = {
   [IPC_CHANNELS.WINDOW_MINIMIZE]: (window) => window.minimize(),
@@ -32,16 +34,16 @@ const WINDOW_CONTROL_ACTIONS: Record<string, (window: BrowserWindow) => void> = 
 
 export class MainApplication {
   readonly #trayManager: TrayManager;
-  readonly #updateService: UpdateService;
+  readonly #startup: StartupSequence;
   readonly #dateFormatter = new Intl.DateTimeFormat(APP_LOCALE, NOTIFICATION_DATE_FORMAT);
   #storage: CalendarStorage | null = null;
   #scheduler: ReminderScheduler | null = null;
   #mainWindow: BrowserWindow | null = null;
   #isQuitting = false;
 
-  constructor(trayManager: TrayManager, updateService: UpdateService) {
+  constructor(trayManager: TrayManager, startup: StartupSequence) {
     this.#trayManager = trayManager;
-    this.#updateService = updateService;
+    this.#startup = startup;
   }
 
   run(): void {
@@ -72,11 +74,24 @@ export class MainApplication {
     this.#registerIpcHandlers(storage);
     this.#trayManager.create({ onOpen: () => this.#revealWindow(), onQuit: () => this.#quit() });
 
-    this.#mainWindow = this.#createWindow();
-    if (!this.#startsHidden()) this.#mainWindow.webContents.once('did-finish-load', () => this.#revealWindow());
-
     this.#scheduler.start();
-    if (settings.autoUpdate) this.#updateService.start();
+    void this.#startup.run({
+      autoUpdate: settings.autoUpdate,
+      backgroundColor: this.#currentBackgroundColor(),
+      openMainWindow: () => this.#openMainWindow(),
+      onFinished: () => this.#revealAfterStartup()
+    });
+  }
+
+  #openMainWindow(): Promise<void> {
+    const window = this.#createWindow();
+    this.#mainWindow = window;
+    return new Promise((resolve) => window.webContents.once(DID_FINISH_LOAD_EVENT, () => resolve()));
+  }
+
+  #revealAfterStartup(): void {
+    if (this.#startsHidden()) return;
+    this.#revealWindow();
   }
 
   #startsHidden(): boolean {
@@ -170,6 +185,7 @@ export class MainApplication {
     ipcMain.handle(IPC_CHANNELS.DELETE_EVENT, (_event, id: string) => events.delete(id));
     ipcMain.handle(IPC_CHANNELS.DELETE_OCCURRENCE, (_event, ref: OccurrenceRef) => events.deleteOccurrence(ref));
     ipcMain.handle(IPC_CHANNELS.GET_SETTINGS, () => settings.getAll());
+    ipcMain.handle(IPC_CHANNELS.GET_APP_VERSION, () => app.getVersion());
     ipcMain.handle(IPC_CHANNELS.UPDATE_SETTINGS, (_event, patch: Partial<Settings>) => {
       const updated = settings.update(patch);
       this.#applyTheme(updated.theme);

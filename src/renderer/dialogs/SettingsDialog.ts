@@ -14,8 +14,11 @@ const SELECTORS = {
   THEME_SELECT: '[data-settings-theme]',
   CITY_INPUT: '[data-settings-city]',
   AUTO_UPDATE_INPUT: '[data-settings-auto-update]',
+  VERSION_LABEL: '[data-settings-version]',
   CANCEL_BUTTON: '[data-settings-cancel]'
 } as const;
+
+const VERSION_LABEL_PREFIX = 'SimpleCalendar ';
 
 export class SettingsDialog implements SettingsEditor {
   readonly #overlay: DialogOverlay;
@@ -24,6 +27,7 @@ export class SettingsDialog implements SettingsEditor {
   readonly #themeSelect: HTMLSelectElement;
   readonly #cityInput: HTMLInputElement;
   readonly #autoUpdateInput: HTMLInputElement;
+  readonly #versionLabel: HTMLElement;
   readonly #handlers: SettingsDialogHandlers;
 
   constructor(overlayElement: HTMLElement, handlers: SettingsDialogHandlers, discardPrompt: DiscardPrompt) {
@@ -37,6 +41,7 @@ export class SettingsDialog implements SettingsEditor {
     this.#themeSelect = requireElement(overlayElement, SELECTORS.THEME_SELECT);
     this.#cityInput = requireElement(overlayElement, SELECTORS.CITY_INPUT);
     this.#autoUpdateInput = requireElement(overlayElement, SELECTORS.AUTO_UPDATE_INPUT);
+    this.#versionLabel = requireElement(overlayElement, SELECTORS.VERSION_LABEL);
     this.#handlers = handlers;
     fillSelect(this.#regionSelect, REGION_OPTIONS);
     fillSelect(this.#themeSelect, THEME_OPTIONS);
@@ -54,6 +59,10 @@ export class SettingsDialog implements SettingsEditor {
 
   close(): void {
     this.#overlay.hide();
+  }
+
+  showVersion(version: string): void {
+    this.#versionLabel.textContent = VERSION_LABEL_PREFIX + version;
   }
 
   #bindInteractions(): void {

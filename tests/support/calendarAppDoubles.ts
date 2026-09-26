@@ -22,6 +22,7 @@ const ELEMENT_TAGS = { CONTAINER: 'div', LABEL: 'span', BUTTON: 'button' } as co
 const FACTORY_NOT_CALLED = 'factory was not called';
 const VIEW_MODE_ORDER: ViewMode[] = ['month', 'week', 'day'];
 const DEFAULT_SCOPE = 'series';
+export const FAKE_APP_VERSION = '1.2.3';
 
 type MockedMethods<T> = { [Key in keyof T]: T[Key] extends (...args: infer Args) => infer Result ? Mock<(...args: Args) => Result> : T[Key] };
 
@@ -88,6 +89,7 @@ export function createCalendarApiMock(settings: Settings, events: CalendarEvent[
     deleteOccurrence: vi.fn<CalendarApi['deleteOccurrence']>(async () => true),
     getSettings: vi.fn<CalendarApi['getSettings']>(async () => settings),
     updateSettings: vi.fn<CalendarApi['updateSettings']>(async (patch) => ({ ...settings, ...patch })),
+    getAppVersion: vi.fn<CalendarApi['getAppVersion']>(async () => FAKE_APP_VERSION),
     minimizeWindow: vi.fn<CalendarApi['minimizeWindow']>(),
     toggleMaximizeWindow: vi.fn<CalendarApi['toggleMaximizeWindow']>(),
     hideWindow: vi.fn<CalendarApi['hideWindow']>()
@@ -104,7 +106,7 @@ export function createCalendarAppDoubles(): CalendarAppDoubles {
   const monthView: MonthViewDouble = { element: document.createElement(ELEMENT_TAGS.CONTAINER), render: vi.fn() };
   const timeGridView: TimeGridViewDouble = { element: document.createElement(ELEMENT_TAGS.CONTAINER), start: vi.fn(), render: vi.fn() };
   const eventDialog: EventDialogDouble = { openForDate: vi.fn(), openForEvent: vi.fn(), close: vi.fn() };
-  const settingsDialog: SettingsDialogDouble = { open: vi.fn(), close: vi.fn() };
+  const settingsDialog: SettingsDialogDouble = { open: vi.fn(), close: vi.fn(), showVersion: vi.fn() };
   const scopePrompt: ScopePromptDouble = { choose: vi.fn(async () => DEFAULT_SCOPE) };
   const weather: WeatherDouble = { start: vi.fn(), configure: vi.fn(async () => {}) };
 

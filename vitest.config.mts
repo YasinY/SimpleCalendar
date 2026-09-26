@@ -3,7 +3,13 @@ import { defineConfig } from 'vitest/config';
 
 const NODE_ENVIRONMENT = 'node';
 const DOM_ENVIRONMENT = 'happy-dom';
-const BOOTSTRAP_FILES = ['src/main/main.ts', 'src/main/preload.ts', 'src/renderer/app.ts'];
+const BOOTSTRAP_FILES = [
+  'src/main/main.ts',
+  'src/main/preload.ts',
+  'src/main/splashPreload.ts',
+  'src/renderer/app.ts',
+  'src/renderer/splash.ts'
+];
 const FULL_COVERAGE_PERCENT = 100;
 const PATH_ALIASES = {
   '@shared': 'src/shared',

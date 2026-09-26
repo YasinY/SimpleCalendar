@@ -12,6 +12,7 @@ export interface CalendarApi {
   deleteOccurrence(ref: OccurrenceRef): Promise<boolean>;
   getSettings(): Promise<Settings>;
   updateSettings(patch: Partial<Settings>): Promise<Settings>;
+  getAppVersion(): Promise<string>;
   minimizeWindow(): void;
   toggleMaximizeWindow(): void;
   hideWindow(): void;

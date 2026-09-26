@@ -7,12 +7,16 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = path.join(ROOT, 'out');
 const RENDERER_OUT = path.join(OUT_DIR, 'renderer');
 const MAIN_OUT = path.join(OUT_DIR, 'main');
-const STATIC_RENDERER_FILES = ['index.html', 'styles.css'];
+const STATIC_RENDERER_FILES = ['index.html', 'styles.css', 'splash.html', 'splash.css'];
 const ELECTRON_TARGET = 'chrome140';
 const NODE_TARGET = 'node22';
 
 const mainOptions = {
-  entryPoints: [path.join(ROOT, 'src/main/main.ts'), path.join(ROOT, 'src/main/preload.ts')],
+  entryPoints: [
+    path.join(ROOT, 'src/main/main.ts'),
+    path.join(ROOT, 'src/main/preload.ts'),
+    path.join(ROOT, 'src/main/splashPreload.ts')
+  ],
   outdir: MAIN_OUT,
   bundle: true,
   platform: 'node',
@@ -24,7 +28,7 @@ const mainOptions = {
 };
 
 const rendererOptions = {
-  entryPoints: [path.join(ROOT, 'src/renderer/app.ts')],
+  entryPoints: [path.join(ROOT, 'src/renderer/app.ts'), path.join(ROOT, 'src/renderer/splash.ts')],
   outdir: RENDERER_OUT,
   bundle: true,
   platform: 'browser',

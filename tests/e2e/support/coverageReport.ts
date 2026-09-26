@@ -16,8 +16,11 @@ const RUNTIME_DEAD_LINES: Record<string, number[]> = {
   'src/main/reminders/reminderRules.ts': [20, 21],
   'src/main/reminders/ReminderScheduler.ts': [18],
   'src/main/storage/schema.ts': [27, 36],
+  'src/main/startup/SplashWindow.ts': [48, 54, 58],
+  'src/main/startup/StartupSequence.ts': [27],
+  'src/main/startup/splashDuration.ts': [7, 9],
   'src/main/tray/TrayManager.ts': [9],
-  'src/main/updates/UpdateService.ts': [20],
+  'src/main/updates/UpdateService.ts': [43, 49, 50, 51, 52, 70, 71, 72, 73, 76, 80, 81, 82, 83, 85, 86, 87, 89, 90, 91, 92, 93],
   'src/renderer/events/eventPill.ts': [19]
 };
 

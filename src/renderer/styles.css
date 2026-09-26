@@ -925,6 +925,14 @@ html[data-transition="switch"]::view-transition-new(calendar) {
   flex: 1 1 auto;
 }
 
+.dialog__version {
+  color: var(--color-ink-muted-48);
+  font-size: var(--text-fine-print-size);
+  font-weight: var(--text-fine-print-weight);
+  line-height: var(--text-fine-print-line);
+  letter-spacing: var(--text-fine-print-tracking);
+}
+
 .field {
   display: flex;
   flex-direction: column;

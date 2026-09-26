@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { _electron as electron, test as base, type ElectronApplication, type Page } from '@playwright/test';
 import { MAIN_RAW_COVERAGE_DIR, PROJECT_ROOT, RENDERER_RAW_COVERAGE_DIR } from './coveragePaths';
+import { acquireMainPage, NO_SPLASH_DELAY_MS, SPLASH_MINIMUM_ENV_VARIABLE, waitForSplashClosed } from './splashWindow';
 import type { CalendarLaunchOptions } from './calendarLaunchOptions';
 import type { RunningCalendar } from './runningCalendar';
 
@@ -18,6 +19,8 @@ const RENDERER_COVERAGE_EXTENSION = '.json';
 const APP_ENTRY = PROJECT_ROOT;
 const HIDDEN_LAUNCH_FLAG = '--hidden';
 const KEEP_RENDERING_OFFSCREEN_FLAG = '--disable-features=CalculateNativeWinOcclusion';
+const REQUIRE_FLAG = '-r';
+const OFFSCREEN_WINDOWS_HOOK_PATH = path.join(__dirname, 'offscreenWindows.cjs').replace(/\\/g, '/');
 const OFFSCREEN_POSITION = { x: -20000, y: -20000 };
 
 export const DEFAULT_LAUNCH_OPTIONS: CalendarLaunchOptions = {
@@ -41,7 +44,8 @@ function buildEnvironment(userData: string): Record<string, string> {
   return {
     ...(process.env as Record<string, string>),
     [V8_COVERAGE_ENV_VARIABLE]: MAIN_RAW_COVERAGE_DIR,
-    [USER_DATA_ENV_VARIABLE]: userData
+    [USER_DATA_ENV_VARIABLE]: userData,
+    [SPLASH_MINIMUM_ENV_VARIABLE]: String(NO_SPLASH_DELAY_MS)
   };
 }
 
@@ -53,8 +57,9 @@ async function saveRendererCoverage(page: Page): Promise<void> {
 }
 
 function buildArguments({ args, visible }: CalendarLaunchOptions): string[] {
-  if (visible) return [APP_ENTRY, ...args];
-  return [APP_ENTRY, HIDDEN_LAUNCH_FLAG, KEEP_RENDERING_OFFSCREEN_FLAG, ...args];
+  const hookArguments = [REQUIRE_FLAG, OFFSCREEN_WINDOWS_HOOK_PATH];
+  if (visible) return [...hookArguments, APP_ENTRY, ...args];
+  return [...hookArguments, APP_ENTRY, HIDDEN_LAUNCH_FLAG, KEEP_RENDERING_OFFSCREEN_FLAG, ...args];
 }
 
 async function showOffscreen(app: ElectronApplication): Promise<void> {
@@ -73,9 +78,10 @@ export async function launchCalendar(options: CalendarLaunchOptions): Promise<Ru
     args: buildArguments(options),
     env: buildEnvironment(userData)
   });
-  const page = await app.firstWindow();
+  const page = await acquireMainPage(app);
   await page.coverage.startJSCoverage({ resetOnNavigation: false });
   await page.waitForLoadState('domcontentloaded');
+  await waitForSplashClosed(app);
   if (!options.visible) await showOffscreen(app);
   return { app, page, userData };
 }
