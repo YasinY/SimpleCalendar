@@ -1,6 +1,8 @@
 import { vi, type Mock } from 'vitest';
 import type { CalendarAppFactories } from '@renderer/calendarAppFactories';
 import type { CalendarElements } from '@renderer/calendarElements';
+import type { DayChangeHandlers } from '@renderer/date/dayChangeHandlers';
+import type { DayChangeNotifier } from '@renderer/date/dayChangeNotifier';
 import type { EventDialogHandlers } from '@renderer/dialogs/eventDialogHandlers';
 import type { EventEditor } from '@renderer/dialogs/eventEditor';
 import type { ScopeChooser } from '@renderer/dialogs/scopeChooser';
@@ -34,6 +36,7 @@ export type EventDialogDouble = MockedMethods<EventEditor>;
 export type SettingsDialogDouble = MockedMethods<SettingsEditor>;
 export type ScopePromptDouble = MockedMethods<ScopeChooser>;
 export type WeatherDouble = MockedMethods<WeatherPresenter>;
+export type DayChangeWatcherDouble = MockedMethods<DayChangeNotifier>;
 
 export interface CalendarAppDoubles {
   factories: CalendarAppFactories;
@@ -43,11 +46,13 @@ export interface CalendarAppDoubles {
   settingsDialog: SettingsDialogDouble;
   scopePrompt: ScopePromptDouble;
   weather: WeatherDouble;
+  dayChangeWatcher: DayChangeWatcherDouble;
   monthHandlers(): MonthViewHandlers;
   timeGridHandlers(): TimeGridHandlers;
   eventDialogHandlers(): EventDialogHandlers;
   settingsHandlers(): SettingsDialogHandlers;
   weatherOptions(): WeatherBadgeOptions;
+  dayChangeHandlers(): DayChangeHandlers;
 }
 
 function requireCaptured<T>(value: T | undefined): T {
@@ -102,6 +107,7 @@ export function createCalendarAppDoubles(): CalendarAppDoubles {
   let eventDialogHandlers: EventDialogHandlers | undefined;
   let settingsHandlers: SettingsDialogHandlers | undefined;
   let weatherOptions: WeatherBadgeOptions | undefined;
+  let dayChangeHandlers: DayChangeHandlers | undefined;
 
   const monthView: MonthViewDouble = { element: document.createElement(ELEMENT_TAGS.CONTAINER), render: vi.fn() };
   const timeGridView: TimeGridViewDouble = { element: document.createElement(ELEMENT_TAGS.CONTAINER), start: vi.fn(), render: vi.fn() };
@@ -109,6 +115,7 @@ export function createCalendarAppDoubles(): CalendarAppDoubles {
   const settingsDialog: SettingsDialogDouble = { open: vi.fn(), close: vi.fn(), showVersion: vi.fn() };
   const scopePrompt: ScopePromptDouble = { choose: vi.fn(async () => DEFAULT_SCOPE) };
   const weather: WeatherDouble = { start: vi.fn(), configure: vi.fn(async () => {}) };
+  const dayChangeWatcher: DayChangeWatcherDouble = { start: vi.fn() };
 
   const factories: CalendarAppFactories = {
     createMonthView: (handlers) => {
@@ -131,6 +138,10 @@ export function createCalendarAppDoubles(): CalendarAppDoubles {
     createWeatherBadge: (options) => {
       weatherOptions = options;
       return weather;
+    },
+    createDayChangeWatcher: (handlers) => {
+      dayChangeHandlers = handlers;
+      return dayChangeWatcher;
     }
   };
 
@@ -142,10 +153,12 @@ export function createCalendarAppDoubles(): CalendarAppDoubles {
     settingsDialog,
     scopePrompt,
     weather,
+    dayChangeWatcher,
     monthHandlers: () => requireCaptured(monthHandlers),
     timeGridHandlers: () => requireCaptured(timeGridHandlers),
     eventDialogHandlers: () => requireCaptured(eventDialogHandlers),
     settingsHandlers: () => requireCaptured(settingsHandlers),
-    weatherOptions: () => requireCaptured(weatherOptions)
+    weatherOptions: () => requireCaptured(weatherOptions),
+    dayChangeHandlers: () => requireCaptured(dayChangeHandlers)
   };
 }

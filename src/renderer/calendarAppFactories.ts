@@ -1,3 +1,5 @@
+import type { DayChangeHandlers } from './date/dayChangeHandlers';
+import type { DayChangeNotifier } from './date/dayChangeNotifier';
 import type { EventDialogHandlers } from './dialogs/eventDialogHandlers';
 import type { EventEditor } from './dialogs/eventEditor';
 import type { ScopeChooser } from './dialogs/scopeChooser';
@@ -17,4 +19,5 @@ export interface CalendarAppFactories {
   createSettingsDialog(handlers: SettingsDialogHandlers): SettingsEditor;
   createScopePrompt(): ScopeChooser;
   createWeatherBadge(options: WeatherBadgeOptions): WeatherPresenter;
+  createDayChangeWatcher(handlers: DayChangeHandlers): DayChangeNotifier;
 }

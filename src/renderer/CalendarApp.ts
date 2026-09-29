@@ -16,6 +16,7 @@ import { moveEventTo } from './events/eventMove';
 import { buildHolidayMap } from './holidays/holidayDates';
 import type { CalendarAppFactories } from './calendarAppFactories';
 import type { CalendarElements } from './calendarElements';
+import type { DayChangeNotifier } from './date/dayChangeNotifier';
 import type { EventEditor } from './dialogs/eventEditor';
 import type { ScopeChooser } from './dialogs/scopeChooser';
 import type { SettingsEditor } from './dialogs/settingsEditor';
@@ -45,6 +46,7 @@ export class CalendarApp {
   readonly #settingsDialog: SettingsEditor;
   readonly #scopePrompt: ScopeChooser;
   readonly #weather: WeatherPresenter;
+  readonly #dayChangeWatcher: DayChangeNotifier;
   #viewMode: ViewMode = DEFAULT_VIEW_MODE;
   #viewDate: Date = VIEW_MODE_CONFIG[DEFAULT_VIEW_MODE].normalize(new Date());
   #events: CalendarEvent[] = [];
@@ -81,6 +83,10 @@ export class CalendarApp {
       onLocationResolved: (location) => void this.#api.updateSettings({ weatherLocation: location })
     });
 
+    this.#dayChangeWatcher = factories.createDayChangeWatcher({
+      onDayChange: (previousDay, today) => void this.#followDayChange(previousDay, today)
+    });
+
     this.#bindNavigation();
     this.#bindViewSwitcher();
     elements.settingsButton.addEventListener('click', () => this.#settingsDialog.open(this.#settings));
@@ -92,6 +98,7 @@ export class CalendarApp {
     this.#viewMode = resolveViewMode(this.#settings.viewMode);
     this.#viewDate = this.#config.normalize(new Date());
     this.#timeGridView.start();
+    this.#dayChangeWatcher.start();
     this.#weather.start();
     void this.#weather.configure(this.#settings.weatherCity, this.#settings.weatherLocation);
     await this.#reloadEvents();
@@ -122,6 +129,12 @@ export class CalendarApp {
     const target = this.#config.normalize(new Date());
     const direction = target > this.#viewDate ? TRANSITION_DIRECTIONS.FORWARD : TRANSITION_DIRECTIONS.BACKWARD;
     void this.#navigateTo(target, direction);
+  }
+
+  async #followDayChange(previousDay: Date, today: Date): Promise<void> {
+    const config = this.#config;
+    if (config.contains(this.#viewDate, previousDay)) this.#viewDate = config.normalize(today);
+    await this.#reloadEvents();
   }
 
   async #navigateTo(target: Date, direction: TransitionDirection): Promise<void> {

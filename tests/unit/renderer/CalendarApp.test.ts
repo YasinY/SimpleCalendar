@@ -26,6 +26,9 @@ import {
 import { createCalendarEvent } from '@tests/support/calendarEventFactory';
 
 const NOW = new Date(2026, 8, 16, 12, 0);
+const TODAY = new Date(2026, 8, 16);
+const NEXT_DAY = new Date(2026, 8, 17);
+const NEXT_DAY_ISO = '2026-09-17';
 const YEAR = 2026;
 const TODAY_ISO = '2026-09-16';
 const WEEK_START_ISO = '2026-09-14';
@@ -59,6 +62,7 @@ const TITLES = {
   CURRENT_WEEK: '14. – 20. September',
   NOVEMBER_FIRST_WEEK: '26. Oktober – 1. November',
   TODAY: 'Mittwoch, 16. September',
+  NEXT_DAY: 'Donnerstag, 17. September',
   YEAR: '2026'
 } as const;
 
@@ -66,7 +70,8 @@ const RANGES = {
   SEPTEMBER_GRID: { from: '2026-08-31', to: '2026-10-04' },
   CURRENT_WEEK: { from: WEEK_START_ISO, to: DROP_TARGET_ISO },
   NOVEMBER_FIRST_WEEK: { from: '2026-10-26', to: '2026-11-01' },
-  TODAY: { from: TODAY_ISO, to: TODAY_ISO }
+  TODAY: { from: TODAY_ISO, to: TODAY_ISO },
+  NEXT_DAY: { from: NEXT_DAY_ISO, to: NEXT_DAY_ISO }
 } as const;
 
 const STORED_EVENT = createCalendarEvent({ id: EVENT_ID, date: TODAY_ISO, title: EVENT_TITLE });
@@ -127,6 +132,16 @@ function lastTimeGridLayout(): DayColumnLayout | undefined {
 
 function columnDates(): string[] | undefined {
   return lastTimeGridLayout()?.columns.map((column) => column.iso);
+}
+
+function todayCellIsos(): string[] | undefined {
+  return doubles.monthView.render.mock.lastCall?.[0].cells.filter((cell) => cell.isToday).map((cell) => cell.iso);
+}
+
+async function passMidnight(): Promise<void> {
+  vi.setSystemTime(NEXT_DAY);
+  doubles.dayChangeHandlers().onDayChange(TODAY, NEXT_DAY);
+  await flushPromises();
 }
 
 function chooseScopeOnce(scope: SeriesScope | null): void {
@@ -244,6 +259,36 @@ describe('CalendarApp', () => {
       expect(replaceSpy).not.toHaveBeenCalled();
       expect(elements.calendar.children).toHaveLength(SINGLE_CHILD);
       expect(doubles.monthView.render).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('day change', () => {
+    it('starts watching for day changes', async () => {
+      await startApp();
+      expect(doubles.dayChangeWatcher.start).toHaveBeenCalledOnce();
+    });
+
+    it('moves the today marker in the month view after midnight', async () => {
+      await startApp();
+      expect(todayCellIsos()).toEqual([TODAY_ISO]);
+      await passMidnight();
+      expect(todayCellIsos()).toEqual([NEXT_DAY_ISO]);
+      expect(titleText().main).toBe(TITLES.SEPTEMBER);
+    });
+
+    it('follows today in the day view after midnight', async () => {
+      await startApp({ viewMode: VIEW_MODES.DAY });
+      await passMidnight();
+      expect(titleText().main).toBe(TITLES.NEXT_DAY);
+      expect(lastRequestedRange()).toEqual(RANGES.NEXT_DAY);
+      expect(lastTimeGridLayout()?.columns[0].isToday).toBe(true);
+    });
+
+    it('keeps a period that did not contain the previous day', async () => {
+      await startApp();
+      await click(elements.next);
+      await passMidnight();
+      expect(titleText().main).toBe(TITLES.OCTOBER);
     });
   });
 

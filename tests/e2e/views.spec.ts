@@ -31,6 +31,8 @@ const SLOT_MINUTES = 14 * 60 + 7;
 const LAST_MINUTE = 1439;
 const FIRST_MINUTE_OFFSET_PX = 1;
 const LAST_MINUTE_OFFSET_PX = -1;
+const BEFORE_MIDNIGHT = '2026-09-16T23:59:30';
+const NEXT_DAY_ISO = '2026-09-17';
 
 const CLASSES = {
   WEEKDAY: '.weekdays__label',
@@ -80,6 +82,7 @@ const TITLES = {
   YEAR: '2026',
   WEEK_ACROSS_MONTHS: '28. September – 4. Oktober',
   DAY: 'Mittwoch, 16. September',
+  NEXT_DAY: 'Donnerstag, 17. September',
   EDIT_DIALOG: 'Ereignis bearbeiten',
   CREATE_DIALOG: 'Neues Ereignis'
 } as const;
@@ -426,6 +429,25 @@ test.describe('day view', () => {
     const bottom = await pointAtMinutes(column, LAST_MINUTE + 1, LAST_MINUTE_OFFSET_PX);
     await page.mouse.dblclick(bottom.x, bottom.y);
     await expect(page.locator(SELECTORS.DIALOG_TIME)).toHaveValue(TIMES.LAST_SLOT);
+  });
+});
+
+test.describe('day change', () => {
+  test('moves the today marker after midnight in the month view', async ({ calendar: { page } }) => {
+    await freezeClock(page, BEFORE_MIDNIGHT);
+    await expect(page.locator(CLASSES.TODAY)).toHaveAttribute(ATTRIBUTES.DATE, TODAY_ISO);
+    await page.clock.runFor(MINUTE_MS);
+    await expect(page.locator(CLASSES.TODAY)).toHaveAttribute(ATTRIBUTES.DATE, NEXT_DAY_ISO);
+  });
+
+  test('follows today after midnight in the day view', async ({ calendar: { page } }) => {
+    await freezeClock(page, BEFORE_MIDNIGHT);
+    await showView(page, VIEW_BUTTONS.DAY);
+    await expect(page.locator(SELECTORS.MONTH_NAME)).toHaveText(TITLES.DAY);
+    await page.clock.runFor(MINUTE_MS);
+    await expect(page.locator(SELECTORS.MONTH_NAME)).toHaveText(TITLES.NEXT_DAY);
+    await expect(timeGridColumn(page, NEXT_DAY_ISO)).toHaveCount(1);
+    await expect(page.locator(CLASSES.TIME_GRID_TODAY)).toHaveCount(1);
   });
 });
 

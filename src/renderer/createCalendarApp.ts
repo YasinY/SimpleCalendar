@@ -1,4 +1,5 @@
 import { CalendarApp } from './CalendarApp';
+import { DayChangeWatcher } from './date/DayChangeWatcher';
 import { DiscardPrompt } from './dialogs/DiscardPrompt';
 import { EventDialog } from './dialogs/EventDialog';
 import { SeriesScopePrompt } from './dialogs/SeriesScopePrompt';
@@ -27,7 +28,8 @@ function createFactories(): CalendarAppFactories {
     createEventDialog: (handlers) => new EventDialog(requireElementById(OVERLAY_IDS.EVENT_DIALOG), handlers, discardPrompt),
     createSettingsDialog: (handlers) => new SettingsDialog(requireElementById(OVERLAY_IDS.SETTINGS_DIALOG), handlers, discardPrompt),
     createScopePrompt: () => new SeriesScopePrompt(requireElementById(OVERLAY_IDS.SCOPE_PROMPT)),
-    createWeatherBadge: (options) => new WeatherBadge(requireElementById(OVERLAY_IDS.WEATHER_BADGE), options)
+    createWeatherBadge: (options) => new WeatherBadge(requireElementById(OVERLAY_IDS.WEATHER_BADGE), options),
+    createDayChangeWatcher: (handlers) => new DayChangeWatcher(handlers)
   };
 }
 
