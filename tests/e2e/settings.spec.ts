@@ -21,6 +21,11 @@ const RAW_CITY = '  Berlin  ';
 const TRIMMED_CITY = 'Berlin';
 const EMPTY_CITY = '';
 const FORECAST = { temperature: 12, code: 0 };
+const TRANSITION_LOG_KEY = 'settingsTransitionLog';
+const SETTINGS_ICON = SETTINGS_SELECTORS.OPEN_BUTTON + ' svg';
+const SETTINGS_ICON_ROTATION = '90deg';
+const UNROTATED = 'none';
+const ANIMATED_PROPERTIES = ['opacity', 'scale', 'translate', 'rotate'];
 
 const THEMES = { SYSTEM: 'system', LIGHT: 'light', DARK: 'dark' } as const satisfies Record<string, Theme>;
 const THEME_BACKGROUNDS = { light: '#ffffff', dark: '#1c1c1e' } as const;
@@ -41,6 +46,28 @@ function windowBackground(app: ElectronApplication): Promise<string> {
 
 function expectedSystemBackground(app: ElectronApplication): Promise<string> {
   return app.evaluate(({ nativeTheme }, backgrounds) => (nativeTheme.shouldUseDarkColors ? backgrounds.dark : backgrounds.light), THEME_BACKGROUNDS);
+}
+
+async function startTransitionLog(page: Page): Promise<void> {
+  await page.evaluate((logKey) => {
+    const log: string[] = [];
+    Object.assign(window, { [logKey]: log });
+    document.addEventListener('transitionrun', (domEvent) => log.push(domEvent.propertyName));
+  }, TRANSITION_LOG_KEY);
+}
+
+function readTransitionLog(page: Page): Promise<string[]> {
+  return page.evaluate((logKey) => (window as unknown as Record<string, string[]>)[logKey], TRANSITION_LOG_KEY);
+}
+
+function clearTransitionLog(page: Page): Promise<void> {
+  return page.evaluate((logKey) => {
+    (window as unknown as Record<string, string[]>)[logKey].length = 0;
+  }, TRANSITION_LOG_KEY);
+}
+
+function readIconRotation(page: Page): Promise<string> {
+  return page.locator(SETTINGS_ICON).evaluate((icon) => getComputedStyle(icon).rotate);
 }
 
 async function expectDialogValues(page: Page, values: { region: string; theme: Theme; city: string }): Promise<void> {
@@ -136,4 +163,34 @@ test.describe('with a configured city', () => {
 test('shows the app version in the settings dialog', async ({ calendar: { page } }) => {
   await openSettings(page);
   await expect(page.locator(SETTINGS_SELECTORS.VERSION)).toHaveText(VERSION_PREFIX + packageVersion);
+});
+
+test.describe('animation', () => {
+  test('animates the dialog and rotates the gear icon when opening and closing', async ({ calendar: { page } }) => {
+    await startTransitionLog(page);
+
+    await openSettings(page);
+    await expect(page.locator(SETTINGS_SELECTORS.OVERLAY)).toBeVisible();
+    await expect.poll(() => readTransitionLog(page)).toEqual(expect.arrayContaining(ANIMATED_PROPERTIES));
+    await expect.poll(() => readIconRotation(page)).toBe(SETTINGS_ICON_ROTATION);
+
+    await clearTransitionLog(page);
+    await page.locator(SETTINGS_SELECTORS.CANCEL).click();
+    await expect(page.locator(SETTINGS_SELECTORS.OVERLAY)).toBeHidden();
+    await expect.poll(() => readTransitionLog(page)).toEqual(expect.arrayContaining(ANIMATED_PROPERTIES));
+    await expect.poll(() => readIconRotation(page)).toBe(UNROTATED);
+  });
+
+  test('opens and closes without animation when reduced motion is preferred', async ({ calendar: { page } }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await startTransitionLog(page);
+
+    await openSettings(page);
+    await expect(page.locator(SETTINGS_SELECTORS.OVERLAY)).toBeVisible();
+    expect(await readIconRotation(page)).toBe(SETTINGS_ICON_ROTATION);
+    await page.locator(SETTINGS_SELECTORS.CANCEL).click();
+    await expect(page.locator(SETTINGS_SELECTORS.OVERLAY)).toBeHidden();
+
+    expect(await readTransitionLog(page)).toEqual([]);
+  });
 });

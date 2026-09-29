@@ -130,6 +130,10 @@
   --picker-transition-duration: 220ms;
   --picker-enter-scale: 0.96;
   --picker-enter-offset: -6px;
+  --overlay-duration: 220ms;
+  --overlay-enter-scale: 0.96;
+  --overlay-enter-offset: 8px;
+  --settings-icon-rotation: 90deg;
   --hover-duration: 120ms;
   --button-padding: 8px 16px;
   --segmented-padding: 8px 14px;
@@ -429,6 +433,14 @@ body {
 .icon-button svg {
   width: var(--icon-size);
   height: var(--icon-size);
+}
+
+.icon-button--settings svg {
+  transition: rotate var(--overlay-duration) var(--reveal-easing);
+}
+
+body:has(.overlay--settings:not([hidden])) .icon-button--settings svg {
+  rotate: var(--settings-icon-rotation);
 }
 
 .calendar {
@@ -873,6 +885,41 @@ html[data-transition="switch"]::view-transition-new(calendar) {
   right: 0;
   height: var(--titlebar-height);
   -webkit-app-region: drag;
+}
+
+.overlay--animated {
+  transition:
+    opacity var(--overlay-duration) var(--reveal-easing),
+    display var(--overlay-duration) allow-discrete;
+}
+
+.overlay--animated[hidden] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@starting-style {
+  .overlay--animated:not([hidden]) {
+    opacity: 0;
+  }
+}
+
+.overlay--animated .dialog {
+  transition:
+    scale var(--overlay-duration) var(--reveal-easing),
+    translate var(--overlay-duration) var(--reveal-easing);
+}
+
+.overlay--animated[hidden] .dialog {
+  scale: var(--overlay-enter-scale);
+  translate: 0 var(--overlay-enter-offset);
+}
+
+@starting-style {
+  .overlay--animated:not([hidden]) .dialog {
+    scale: var(--overlay-enter-scale);
+    translate: 0 var(--overlay-enter-offset);
+  }
 }
 
 .dialog {
@@ -1322,6 +1369,9 @@ html[data-transition="picker-backward"]::view-transition-new(date-picker-grid) {
 
 @media (prefers-reduced-motion: reduce) {
   .reveal,
+  .overlay--animated,
+  .overlay--animated .dialog,
+  .icon-button--settings svg,
   .date-picker,
   .date-picker__day,
   .date-field__trigger,
