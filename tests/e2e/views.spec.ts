@@ -17,7 +17,8 @@ import {
   seedEvents,
   setAttribute,
   showView,
-  timeGridColumn
+  timeGridColumn,
+  waitForSettledView
 } from './support/calendarViewHelpers';
 
 const MONTH_CELL_COUNT = 35;
@@ -163,6 +164,26 @@ const MULTI_DAY_EVENTS = [
 ];
 
 const SINGLE_EVENT = [{ date: TODAY_ISO, time: '09:00', endTime: '10:00', title: 'Termin' }];
+const CROWDED_EVENT_COUNT = 8;
+const CROWDED_FIRST_HOUR = 8;
+const HOUR_PAD = 2;
+const HOUR_PAD_CHARACTER = '0';
+const CROWDED_EVENTS = Array.from({ length: CROWDED_EVENT_COUNT }, (_, index) => ({
+  date: TODAY_ISO,
+  time: String(CROWDED_FIRST_HOUR + index).padStart(HOUR_PAD, HOUR_PAD_CHARACTER) + ':00',
+  title: 'Termin ' + (index + 1)
+}));
+const MORE_SELECTOR = '.day__more';
+const EVENTS_SELECTOR = '.day__events';
+const VISIBLE_EVENT_SELECTOR = SELECTORS.EVENT + ':visible';
+const MORE_LABEL = /^\+(\d+) weitere$/;
+const SINGLE_COLUMN = 1;
+
+async function bottomOf(locator: Locator): Promise<number> {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error(await locator.evaluate((element) => element.className));
+  return box.y + box.height;
+}
 
 function eventByTitle(scope: Locator, title: string): Locator {
   return scope.locator(SELECTORS.EVENT, { hasText: title });
@@ -215,6 +236,26 @@ test.describe('month view', () => {
     await expect(eventByTitle(today, 'Frei').locator(SELECTORS.EVENT_TIME)).toHaveText(TIMES.ALL_DAY);
     await expect(eventByTitle(today, 'Kurz').locator(SELECTORS.EVENT_TIME)).toHaveText('14:00–15:00');
     await expect(eventByTitle(today, 'Offen').locator(SELECTORS.EVENT_TIME)).toHaveText('16:00');
+  });
+
+  test('collapses clipped pills into a more button that opens the day view', async ({ calendar: { page } }) => {
+    await seedEvents(page, CROWDED_EVENTS);
+    await freezeClock(page);
+    const today = dayCell(page, TODAY_ISO);
+    const moreButton = today.locator(CLASSES.DAY_HEADER).locator(MORE_SELECTOR);
+    await expect(moreButton).toBeVisible();
+    await expect(moreButton).toHaveText(MORE_LABEL);
+    const hiddenCount = Number(MORE_LABEL.exec(await moreButton.innerText())?.[1]);
+    const visiblePills = today.locator(VISIBLE_EVENT_SELECTOR);
+    await expect(visiblePills).toHaveCount(CROWDED_EVENT_COUNT - hiddenCount);
+    const limit = await bottomOf(today.locator(EVENTS_SELECTOR));
+    for (const pill of await visiblePills.all()) expect(await bottomOf(pill)).toBeLessThanOrEqual(limit);
+
+    await moreButton.click();
+    await waitForSettledView(page);
+    await expect(page.locator(SELECTORS.MONTH_NAME)).toHaveText(TITLES.DAY);
+    await expect(page.locator(SELECTORS.TIME_GRID_COLUMN)).toHaveCount(SINGLE_COLUMN);
+    await expect(page.locator(SELECTORS.EVENT)).toHaveCount(CROWDED_EVENT_COUNT);
   });
 
   test('sorts multi day and all day pills first and marks continuing days', async ({ calendar: { page } }) => {

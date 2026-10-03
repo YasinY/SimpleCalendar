@@ -119,6 +119,7 @@ export const CSS_CLASSES = {
   DAY_HEADER: 'day__header',
   DAY_NUMBER: 'day__number',
   DAY_EVENTS: 'day__events',
+  DAY_MORE: 'day__more',
   EVENT: 'event',
   EVENT_BLOCK: 'event--block',
   EVENT_CONTINUES_BEFORE: 'event--continues-before',
@@ -186,6 +187,7 @@ export const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 export const GRID_WEEK_CLASS_PREFIX = 'grid--weeks-';
 export const HOLIDAY_NAME_SEPARATOR = ', ';
+export const MORE_EVENTS_LABEL = { PREFIX: '+', SUFFIX: ' weitere' } as const;
 export const ESCAPE_KEY = 'Escape';
 export const HIDDEN_ATTRIBUTE = 'hidden';
 

@@ -658,6 +658,32 @@ html[data-transition="switch"]::view-transition-new(calendar) {
   overflow: hidden;
 }
 
+.day__more {
+  flex: none;
+  padding: var(--event-padding);
+  border: 0;
+  border-radius: var(--rounded-pill);
+  background-color: transparent;
+  color: var(--color-ink-muted-48);
+  font-family: var(--font-text);
+  font-size: var(--text-fine-print-size);
+  font-weight: var(--text-caption-strong-weight);
+  line-height: var(--text-fine-print-line);
+  letter-spacing: var(--text-fine-print-tracking);
+  cursor: default;
+  transition: color var(--hover-duration), background-color var(--hover-duration);
+}
+
+.day__more:hover {
+  background-color: var(--color-canvas-parchment);
+  color: var(--color-ink);
+}
+
+.day__more:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: 1px;
+}
+
 .event {
   display: flex;
   flex-direction: column;

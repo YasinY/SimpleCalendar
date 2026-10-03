@@ -336,6 +336,16 @@ describe('CalendarApp', () => {
       expect(doubles.eventDialog.openForDate).toHaveBeenCalledExactlyOnceWith(TODAY_ISO);
     });
 
+    it('jumps to the day view of an activated more button and persists the view', async () => {
+      await startApp();
+      doubles.monthHandlers().onMoreActivate(NEXT_DAY_ISO);
+      await flushPromises();
+      expect(api.updateSettings).toHaveBeenCalledExactlyOnceWith({ viewMode: VIEW_MODES.DAY });
+      expect(columnDates()).toEqual([NEXT_DAY_ISO]);
+      expect(titleText().main).toBe(TITLES.NEXT_DAY);
+      expect(isActive(VIEW_MODES.DAY)).toBe(true);
+    });
+
     it('opens the event dialog with the time of an activated slot', async () => {
       await startApp({ viewMode: VIEW_MODES.WEEK });
       doubles.timeGridHandlers().onSlotActivate(TODAY_ISO, SLOT_TIME);

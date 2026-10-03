@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CSS_CLASSES,
   EVENT_DURATION_CLASS_PREFIX,
   GRID_WEEK_CLASS_PREFIX,
   HOLIDAY_NAME_SEPARATOR,
   MIN_STRETCHED_DURATION_STEPS,
+  MORE_EVENTS_LABEL,
   WEEKDAY_LABELS
 } from '@renderer/constants';
 import { DRAG_EVENTS } from '@renderer/dragDrop/dragTransfer';
@@ -13,6 +14,8 @@ import { toEventKey } from '@renderer/events/eventKey';
 import { MonthView } from '@renderer/views/MonthView';
 import { createCalendarEvent } from '@tests/support/calendarEventFactory';
 import { createDragEvent, createPayloadTransfer, readTransferPayload } from '@tests/support/dragEvents';
+import { fakeBottom } from '@tests/support/layoutRects';
+import { stubResizeObserver, type ResizeObserverStub } from '@tests/support/resizeObserverStub';
 import type { MonthCell } from '@renderer/date/monthCell';
 import type { MonthGrid } from '@renderer/date/monthGrid';
 import type { HolidayMap } from '@renderer/holidays/holidayDates';
@@ -43,6 +46,13 @@ const EARLY_EVENT_STEPS = 3;
 
 const DAY_SELECTOR = '.' + CSS_CLASSES.DAY;
 const EVENT_SELECTOR = '.' + CSS_CLASSES.EVENT;
+const MORE_SELECTOR = '.' + CSS_CLASSES.DAY_MORE;
+const EVENTS_SELECTOR = '.' + CSS_CLASSES.DAY_EVENTS;
+const HEADER_SELECTOR = '.' + CSS_CLASSES.DAY_HEADER;
+const GRID_SELECTOR = '.' + CSS_CLASSES.GRID;
+const TODAY_PILL_COUNT = 3;
+const CLIPPED_PILL_BOTTOM = 100;
+const SHORT_LIST_BOTTOM = 50;
 
 const CELLS: MonthCell[] = [
   { iso: OUTSIDE_ISO, dayNumber: OUTSIDE_DAY_NUMBER, isCurrentMonth: false, isToday: false },
@@ -55,7 +65,7 @@ function createGrid(weekCount: number): MonthGrid {
 }
 
 function createHandlers(): MonthViewHandlers {
-  return { onDayActivate: vi.fn(), onEventActivate: vi.fn(), onEventDrop: vi.fn() };
+  return { onDayActivate: vi.fn(), onMoreActivate: vi.fn(), onEventActivate: vi.fn(), onEventDrop: vi.fn() };
 }
 
 function dispatchMouse(target: Element, type: string): void {
@@ -66,8 +76,10 @@ describe('MonthView', () => {
   let handlers: MonthViewHandlers;
   let view: MonthView;
   let dayElements: HTMLElement[];
+  let resizeObserver: ResizeObserverStub;
 
   beforeEach(() => {
+    resizeObserver = stubResizeObserver();
     handlers = createHandlers();
     view = new MonthView(handlers);
     document.body.replaceChildren(view.element);
@@ -76,6 +88,22 @@ describe('MonthView', () => {
     view.render(createGrid(WEEK_COUNT), segmentsByDate, holidaysByDate);
     dayElements = [...view.element.querySelectorAll<HTMLElement>(DAY_SELECTOR)];
   });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function requireMoreButton(dayElement: ParentNode): HTMLButtonElement {
+    const moreButton = dayElement.querySelector<HTMLButtonElement>(MORE_SELECTOR);
+    if (!moreButton) throw new Error(MORE_SELECTOR);
+    return moreButton;
+  }
+
+  function clipTodayPills(): void {
+    const [, todayDay] = dayElements;
+    fakeBottom(todayDay.querySelector(EVENTS_SELECTOR) as Element, () => SHORT_LIST_BOTTOM);
+    for (const pill of todayDay.querySelectorAll(EVENT_SELECTOR)) fakeBottom(pill, () => CLIPPED_PILL_BOTTOM);
+  }
 
   function requirePill(eventKey: string, dayElement: ParentNode = view.element): HTMLButtonElement {
     const pill = dayElement.querySelector<HTMLButtonElement>(`${EVENT_SELECTOR}[data-event-key="${eventKey}"]`);
@@ -146,6 +174,39 @@ describe('MonthView', () => {
     expect(grid.classList.contains(GRID_WEEK_CLASS_PREFIX + WEEK_COUNT)).toBe(false);
     expect(grid.classList.contains(GRID_WEEK_CLASS_PREFIX + OTHER_WEEK_COUNT)).toBe(true);
     expect(grid.classList.contains(CSS_CLASSES.GRID)).toBe(true);
+  });
+
+  it('adds a hidden more button to the header of days with events only', () => {
+    const [, todayDay, holidayDay] = dayElements;
+    const moreButton = requireMoreButton(todayDay);
+    expect(moreButton.hidden).toBe(true);
+    expect(moreButton.parentElement?.classList.contains(CSS_CLASSES.DAY_HEADER)).toBe(true);
+    expect(moreButton.nextElementSibling?.classList.contains(CSS_CLASSES.DAY_NUMBER)).toBe(true);
+    expect(holidayDay.querySelector(HEADER_SELECTOR + ' ' + MORE_SELECTOR)).not.toBeNull();
+    view.render(createGrid(WEEK_COUNT), new Map(), new Map());
+    expect(view.element.querySelector(MORE_SELECTOR)).toBeNull();
+  });
+
+  it('observes the grid and collapses clipped pills into the more button on resize', () => {
+    const [, todayDay] = dayElements;
+    expect(resizeObserver.observed).toContain(view.element.querySelector(GRID_SELECTOR));
+    clipTodayPills();
+    resizeObserver.trigger();
+    const moreButton = requireMoreButton(todayDay);
+    expect(moreButton.hidden).toBe(false);
+    expect(moreButton.textContent).toBe(MORE_EVENTS_LABEL.PREFIX + TODAY_PILL_COUNT + MORE_EVENTS_LABEL.SUFFIX);
+    expect([...todayDay.querySelectorAll<HTMLElement>(EVENT_SELECTOR)].every((pill) => pill.hidden)).toBe(true);
+  });
+
+  it('activates the day of a clicked more button', () => {
+    dispatchMouse(requireMoreButton(dayElements[1]), 'click');
+    expect(handlers.onMoreActivate).toHaveBeenCalledWith(TODAY_ISO);
+    expect(handlers.onEventActivate).not.toHaveBeenCalled();
+  });
+
+  it('does not activate a day when double clicking the more button', () => {
+    dispatchMouse(requireMoreButton(dayElements[1]), 'dblclick');
+    expect(handlers.onDayActivate).not.toHaveBeenCalled();
   });
 
   it('activates an event when its pill is clicked', () => {

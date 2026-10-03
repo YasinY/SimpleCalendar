@@ -162,6 +162,7 @@ const WHITESPACE_TITLE = '   ';
 const DRAFT_TITLE = 'Entwurf';
 const DRAFT_CITY = 'Entwurfsstadt';
 
+const DAY_VIEW_SETTINGS = { viewMode: 'day' } as const;
 const SEEDED_EVENTS = {
   UNKNOWN_COLOR: { id: 'seed-unknown-color', title: 'Neonfarbe', time: '08:00' },
   DETAILED: { id: 'seed-detailed', title: 'Zahnarzt', time: '10:00', endTime: '11:00', notes: 'Bonusheft mitnehmen', reminderMinutes: 30 },
@@ -190,6 +191,10 @@ async function openCreateDialog(page: Page): Promise<void> {
 
 function eventPill(page: Page, title: string) {
   return page.locator(SELECTORS.TODAY).locator(SELECTORS.EVENT, { hasText: title });
+}
+
+function seededEvent(page: Page, title: string) {
+  return page.locator(SELECTORS.EVENT, { hasText: title });
 }
 
 function eventsOfToday(page: Page): Promise<CalendarEvent[]> {
@@ -556,10 +561,10 @@ test.describe('editing a series', () => {
 });
 
 test.describe('editing seeded events', () => {
-  test.use({ calendarLaunch: { ...DEFAULT_LAUNCH_OPTIONS, legacyEvents: seededEvents(todayIso()) } });
+  test.use({ calendarLaunch: { ...DEFAULT_LAUNCH_OPTIONS, legacyEvents: seededEvents(todayIso()), settings: DAY_VIEW_SETTINGS } });
 
   test('falls back to blue for an unknown color and shows an empty reminder', async ({ calendar: { page } }) => {
-    await eventPill(page, SEEDED_EVENTS.UNKNOWN_COLOR.title).click();
+    await seededEvent(page, SEEDED_EVENTS.UNKNOWN_COLOR.title).click();
 
     await expect(page.locator(SELECTORS.TITLE)).toHaveValue(SEEDED_EVENTS.UNKNOWN_COLOR.title);
     await expect(page.locator(SELECTORS.TIME)).toHaveValue(SEEDED_EVENTS.UNKNOWN_COLOR.time);
@@ -572,7 +577,7 @@ test.describe('editing seeded events', () => {
 
   test('shows all stored values of a detailed event', async ({ calendar: { page } }) => {
     const { DETAILED } = SEEDED_EVENTS;
-    await eventPill(page, DETAILED.title).click();
+    await seededEvent(page, DETAILED.title).click();
 
     await expect(page.locator(SELECTORS.HEADING)).toHaveText(LABELS.EDIT_TITLE);
     await expect(page.locator(SELECTORS.TITLE)).toHaveValue(DETAILED.title);
@@ -584,7 +589,7 @@ test.describe('editing seeded events', () => {
   });
 
   test('shows an all day event with disabled time fields', async ({ calendar: { page } }) => {
-    await eventPill(page, SEEDED_EVENTS.ALL_DAY.title).click();
+    await seededEvent(page, SEEDED_EVENTS.ALL_DAY.title).click();
 
     await expect(page.locator(SELECTORS.ALL_DAY)).toBeChecked();
     await expect(page.locator(SELECTORS.TIME)).toBeDisabled();
@@ -593,22 +598,22 @@ test.describe('editing seeded events', () => {
 
   test('keeps the event id when saving an edit', async ({ calendar: { page } }) => {
     const { DETAILED } = SEEDED_EVENTS;
-    await eventPill(page, DETAILED.title).click();
+    await seededEvent(page, DETAILED.title).click();
     await page.locator(SELECTORS.TITLE).fill(DRAFT_TITLE);
     await submitDialog(page);
 
-    await expect(eventPill(page, DRAFT_TITLE)).toHaveCount(1);
+    await expect(seededEvent(page, DRAFT_TITLE)).toHaveCount(1);
     const stored = await eventsOfToday(page);
     expect(stored.find((event) => event.id === DETAILED.id)?.title).toBe(DRAFT_TITLE);
   });
 
   test('deletes an event from the edit dialog', async ({ calendar: { page } }) => {
     const { DETAILED } = SEEDED_EVENTS;
-    await eventPill(page, DETAILED.title).click();
+    await seededEvent(page, DETAILED.title).click();
     await page.locator(SELECTORS.DELETE).click();
 
     await expect(page.locator(SELECTORS.OVERLAY)).toBeHidden();
-    await expect(eventPill(page, DETAILED.title)).toHaveCount(0);
+    await expect(seededEvent(page, DETAILED.title)).toHaveCount(0);
     const stored = await eventsOfToday(page);
     expect(stored.some((event) => event.id === DETAILED.id)).toBe(false);
   });

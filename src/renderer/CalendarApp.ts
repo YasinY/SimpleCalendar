@@ -7,7 +7,7 @@ import {
   VIEW_MODES,
   type TransitionDirection
 } from './constants';
-import { buildDayColumns, buildMonthGrid, getWeekDays } from './date/dateUtils';
+import { buildDayColumns, buildMonthGrid, fromIsoDate, getWeekDays } from './date/dateUtils';
 import { VIEW_MODE_CONFIG, resolveViewMode, type ViewModeConfig } from './date/viewModes';
 import { runWithTransition } from './dom/transitions';
 import { groupSegmentsByDate } from './events/eventGrouping';
@@ -58,6 +58,7 @@ export class CalendarApp {
 
     this.#monthView = factories.createMonthView({
       onDayActivate: (isoDate) => this.#eventDialog.openForDate(isoDate),
+      onMoreActivate: (isoDate) => this.#changeView(VIEW_MODES.DAY, fromIsoDate(isoDate)),
       onEventActivate: (eventKey) => this.#openEvent(eventKey),
       onEventDrop: (eventKey, target) => void this.#moveEvent(eventKey, target)
     });
@@ -145,7 +146,10 @@ export class CalendarApp {
   #switchView(viewMode: ViewMode): void {
     if (viewMode === this.#viewMode) return;
     const today = new Date();
-    const anchor = this.#config.contains(this.#viewDate, today) ? today : this.#viewDate;
+    this.#changeView(viewMode, this.#config.contains(this.#viewDate, today) ? today : this.#viewDate);
+  }
+
+  #changeView(viewMode: ViewMode, anchor: Date): void {
     this.#viewMode = viewMode;
     this.#viewDate = this.#config.normalize(anchor);
     void this.#api.updateSettings({ viewMode });
