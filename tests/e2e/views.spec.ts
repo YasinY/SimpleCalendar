@@ -179,10 +179,34 @@ const VISIBLE_EVENT_SELECTOR = SELECTORS.EVENT + ':visible';
 const MORE_LABEL = /^\+(\d+) weitere$/;
 const SINGLE_COLUMN = 1;
 
-async function bottomOf(locator: Locator): Promise<number> {
+const BLOCK_TITLES = {
+  HOUR: 'Sechzig',
+  HALF_HOUR: 'Dreißig',
+  QUARTER_HOUR: 'Fünfzehn'
+} as const;
+const BLOCK_HEIGHT_EVENTS = [
+  { date: TODAY_ISO, time: '12:00', endTime: '13:00', title: BLOCK_TITLES.HOUR },
+  { date: TODAY_ISO, time: '13:00', endTime: '13:30', title: BLOCK_TITLES.HALF_HOUR },
+  { date: TODAY_ISO, time: '14:00', endTime: '14:15', title: BLOCK_TITLES.QUARTER_HOUR }
+];
+const BLOCK_HEIGHT_SCROLL_MINUTES = 13 * 60;
+const LABEL_FONT_SIZE_PX = 12;
+
+type Box = NonNullable<Awaited<ReturnType<Locator['boundingBox']>>>;
+
+async function boxOf(locator: Locator): Promise<Box> {
   const box = await locator.boundingBox();
   if (!box) throw new Error(await locator.evaluate((element) => element.className));
+  return box;
+}
+
+async function bottomOf(locator: Locator): Promise<number> {
+  const box = await boxOf(locator);
   return box.y + box.height;
+}
+
+async function topOf(locator: Locator): Promise<number> {
+  return (await boxOf(locator)).y;
 }
 
 function eventByTitle(scope: Locator, title: string): Locator {
@@ -455,7 +479,31 @@ test.describe('day view', () => {
     await expect(column.locator(SELECTORS.EVENT)).toHaveCount(0);
   });
 
-  test('clamps double click times to the first and last slot of the day', async ({ calendar: { page } }) => {
+  test('keeps title and time readable inside short blocks', async ({ calendar: { page } }) => {
+    await seedEvents(page, BLOCK_HEIGHT_EVENTS);
+    await freezeClock(page);
+    await showView(page, VIEW_BUTTONS.DAY);
+    await scrollToMinutes(page, BLOCK_HEIGHT_SCROLL_MINUTES);
+    const column = timeGridColumn(page, TODAY_ISO);
+
+    for (const { title } of BLOCK_HEIGHT_EVENTS) {
+      const block = eventByTitle(column, title);
+      const blockBox = await boxOf(block);
+      const labelBoxes = [await boxOf(block.locator(SELECTORS.EVENT_TITLE)), await boxOf(block.locator(SELECTORS.EVENT_TIME))];
+      for (const labelBox of labelBoxes) {
+        expect(labelBox.height).toBeGreaterThanOrEqual(LABEL_FONT_SIZE_PX);
+        expect(labelBox.y).toBeGreaterThanOrEqual(blockBox.y);
+        expect(labelBox.y + labelBox.height).toBeLessThanOrEqual(blockBox.y + blockBox.height);
+      }
+    }
+
+    const stacked = eventByTitle(column, BLOCK_TITLES.HOUR);
+    expect(await topOf(stacked.locator(SELECTORS.EVENT_TIME))).toBeGreaterThan(await topOf(stacked.locator(SELECTORS.EVENT_TITLE)));
+    const inline = eventByTitle(column, BLOCK_TITLES.HALF_HOUR);
+    expect(await topOf(inline.locator(SELECTORS.EVENT_TIME))).toBe(await topOf(inline.locator(SELECTORS.EVENT_TITLE)));
+  });
+
+  test('clamps double click times to the first and last slot of the day',async ({ calendar: { page } }) => {
     await freezeClock(page);
     await showView(page, VIEW_BUTTONS.DAY);
     const column = timeGridColumn(page, TODAY_ISO);

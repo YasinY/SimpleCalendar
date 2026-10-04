@@ -862,6 +862,36 @@ html[data-transition="switch"]::view-transition-new(calendar) {
   min-height: var(--event-min-block-height);
   border: 1px solid var(--color-canvas);
   overflow: hidden;
+  flex-flow: row wrap;
+  align-content: flex-start;
+  column-gap: var(--space-xxs);
+  container: event-block / size;
+}
+
+.event--block .event__title {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+/* container conditions cannot read custom properties: 32px fits two fine print lines, 16px fits one */
+@container event-block (height < 32px) {
+  .event--block .event__title {
+    flex: 0 1 auto;
+  }
+
+  .event--block .event__time {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+}
+
+@container event-block (height < 16px) {
+  .event--block .event__title,
+  .event--block .event__time {
+    line-height: 1;
+  }
 }
 
 .now-line {
