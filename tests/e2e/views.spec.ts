@@ -182,15 +182,17 @@ const SINGLE_COLUMN = 1;
 const BLOCK_TITLES = {
   HOUR: 'Sechzig',
   HALF_HOUR: 'Dreißig',
-  QUARTER_HOUR: 'Fünfzehn'
+  QUARTER_HOUR: 'Fünfzehn',
+  LONG_HALF_HOUR: 'Ausführliches Vorstellungsgespräch mit dem gesamten Entwicklungsteam vor Ort'
 } as const;
 const BLOCK_HEIGHT_EVENTS = [
   { date: TODAY_ISO, time: '12:00', endTime: '13:00', title: BLOCK_TITLES.HOUR },
   { date: TODAY_ISO, time: '13:00', endTime: '13:30', title: BLOCK_TITLES.HALF_HOUR },
-  { date: TODAY_ISO, time: '14:00', endTime: '14:15', title: BLOCK_TITLES.QUARTER_HOUR }
+  { date: TODAY_ISO, time: '14:00', endTime: '14:15', title: BLOCK_TITLES.QUARTER_HOUR },
+  { date: TODAY_ISO, time: '15:00', endTime: '15:30', title: BLOCK_TITLES.LONG_HALF_HOUR }
 ];
 const BLOCK_HEIGHT_SCROLL_MINUTES = 13 * 60;
-const LABEL_FONT_SIZE_PX = 12;
+const MIN_LABEL_HEIGHT_PX = 10;
 
 type Box = NonNullable<Awaited<ReturnType<Locator['boundingBox']>>>;
 
@@ -482,25 +484,30 @@ test.describe('day view', () => {
   test('keeps title and time readable inside short blocks', async ({ calendar: { page } }) => {
     await seedEvents(page, BLOCK_HEIGHT_EVENTS);
     await freezeClock(page);
-    await showView(page, VIEW_BUTTONS.DAY);
-    await scrollToMinutes(page, BLOCK_HEIGHT_SCROLL_MINUTES);
     const column = timeGridColumn(page, TODAY_ISO);
 
-    for (const { title } of BLOCK_HEIGHT_EVENTS) {
-      const block = eventByTitle(column, title);
-      const blockBox = await boxOf(block);
-      const labelBoxes = [await boxOf(block.locator(SELECTORS.EVENT_TITLE)), await boxOf(block.locator(SELECTORS.EVENT_TIME))];
-      for (const labelBox of labelBoxes) {
-        expect(labelBox.height).toBeGreaterThanOrEqual(LABEL_FONT_SIZE_PX);
-        expect(labelBox.y).toBeGreaterThanOrEqual(blockBox.y);
-        expect(labelBox.y + labelBox.height).toBeLessThanOrEqual(blockBox.y + blockBox.height);
-      }
-    }
+    for (const view of [VIEW_BUTTONS.DAY, VIEW_BUTTONS.WEEK]) {
+      await showView(page, view);
+      await scrollToMinutes(page, BLOCK_HEIGHT_SCROLL_MINUTES);
 
-    const stacked = eventByTitle(column, BLOCK_TITLES.HOUR);
-    expect(await topOf(stacked.locator(SELECTORS.EVENT_TIME))).toBeGreaterThan(await topOf(stacked.locator(SELECTORS.EVENT_TITLE)));
-    const inline = eventByTitle(column, BLOCK_TITLES.HALF_HOUR);
-    expect(await topOf(inline.locator(SELECTORS.EVENT_TIME))).toBe(await topOf(inline.locator(SELECTORS.EVENT_TITLE)));
+      for (const { title } of BLOCK_HEIGHT_EVENTS) {
+        const block = eventByTitle(column, title);
+        const blockBox = await boxOf(block);
+        const labelBoxes = [await boxOf(block.locator(SELECTORS.EVENT_TITLE)), await boxOf(block.locator(SELECTORS.EVENT_TIME))];
+        for (const labelBox of labelBoxes) {
+          expect(labelBox.height).toBeGreaterThanOrEqual(MIN_LABEL_HEIGHT_PX);
+          expect(labelBox.y).toBeGreaterThanOrEqual(blockBox.y);
+          expect(labelBox.y + labelBox.height).toBeLessThanOrEqual(blockBox.y + blockBox.height);
+        }
+      }
+
+      for (const title of [BLOCK_TITLES.HOUR, BLOCK_TITLES.HALF_HOUR, BLOCK_TITLES.LONG_HALF_HOUR]) {
+        const stacked = eventByTitle(column, title);
+        expect(await topOf(stacked.locator(SELECTORS.EVENT_TIME))).toBeGreaterThan(await topOf(stacked.locator(SELECTORS.EVENT_TITLE)));
+      }
+      const inline = eventByTitle(column, BLOCK_TITLES.QUARTER_HOUR);
+      expect(await topOf(inline.locator(SELECTORS.EVENT_TIME))).toBe(await topOf(inline.locator(SELECTORS.EVENT_TITLE)));
+    }
   });
 
   test('clamps double click times to the first and last slot of the day',async ({ calendar: { page } }) => {

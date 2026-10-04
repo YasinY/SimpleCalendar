@@ -114,6 +114,9 @@
   --event-duration-step: 12px;
   --event-time-opacity: 0.8;
   --event-min-block-height: 18px;
+  --event-compact-font-size: 10px;
+  --event-compact-line: 1.1;
+  --event-compact-lift: -1px;
   --input-height: 44px;
   --textarea-height: 88px;
   --dialog-width: 420px;
@@ -873,10 +876,23 @@ html[data-transition="switch"]::view-transition-new(calendar) {
   min-width: 0;
 }
 
-/* container conditions cannot read custom properties: 32px fits two fine print lines, 16px fits one */
-@container event-block (height < 32px) {
+/* container conditions cannot read custom properties: 32px fits two fine print lines, 19px two compact lines, 16px one fine print line */
+@container event-block (19px <= height < 32px) {
+  .event--block .event__title,
+  .event--block .event__time {
+    font-size: var(--event-compact-font-size);
+    line-height: var(--event-compact-line);
+  }
+
+  .event--block .event__title {
+    margin-top: var(--event-compact-lift);
+  }
+}
+
+@container event-block (height < 19px) {
   .event--block .event__title {
     flex: 0 1 auto;
+    max-width: calc(100% - var(--space-xxs));
   }
 
   .event--block .event__time {
