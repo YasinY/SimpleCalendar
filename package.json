@@ -1,6 +1,6 @@
 {
   "name": "simplecalendar",
-  "version": "1.2.14",
+  "version": "1.2.15",
   "private": true,
   "description": "Persönlicher Kalender für Windows mit Feiertagen, Wetter und Erinnerungen, lokal gespeichert im Tray",
   "author": "yasin@yazici.dev",
