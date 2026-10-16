@@ -185,6 +185,7 @@ body {
   }
 }
 
+.logo--busy .logo__page,
 .logo--busy .logo__header,
 .logo--busy .logo__ring {
   animation-name: pulse;
