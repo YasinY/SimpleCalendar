@@ -185,6 +185,22 @@ body {
   }
 }
 
+.logo--busy .logo__header,
+.logo--busy .logo__ring {
+  animation-name: pulse;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: var(--breathe-opacity);
+  }
+}
+
 @keyframes breathe {
   0%,
   100% {
