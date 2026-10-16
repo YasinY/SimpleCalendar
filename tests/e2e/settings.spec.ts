@@ -20,6 +20,10 @@ const SEEDED_CITY = 'Hamburg';
 const RAW_CITY = '  Berlin  ';
 const TRIMMED_CITY = 'Berlin';
 const EMPTY_CITY = '';
+const REGION_GROUP_COUNT = 3;
+const LABEL_ATTRIBUTE = 'label';
+const AUSTRIA_LABEL = 'Österreich';
+const AUSTRIA_NATIONWIDE_LABEL = 'Österreich (bundesweit)';
 const CITY_QUERY = 'Hamb';
 const AMBIGUOUS_QUERY = 'Neustadt';
 const UNKNOWN_QUERY = 'Nirgendwoheim';
@@ -28,7 +32,8 @@ const ARROW_DOWN_KEY = 'ArrowDown';
 const ARROW_UP_KEY = 'ArrowUp';
 const ENTER_KEY = 'Enter';
 const HAMBURG_DETAILS = 'Hamburg, Deutschland';
-const MAX_SUGGESTIONS = 8;
+const LARGEST_LOCAL_CITY = 'Berlin';
+const RENDERED_WINDOW = 16;
 const SUGGESTION_ATTRIBUTE = 'aria-expanded';
 const EXPANDED = 'true';
 const COLLAPSED = 'false';
@@ -90,6 +95,15 @@ async function expectDialogValues(page: Page, values: { region: string; theme: T
   await expect(page.locator(SETTINGS_SELECTORS.CITY)).toHaveValue(values.city);
   await page.locator(SETTINGS_SELECTORS.CANCEL).click();
 }
+
+test('groups the holiday regions by country', async ({ calendar: { page } }) => {
+  await openSettings(page);
+  const groups = page.locator(SETTINGS_SELECTORS.REGION + ' optgroup');
+
+  await expect(groups).toHaveCount(REGION_GROUP_COUNT);
+  await expect(groups.nth(1)).toHaveAttribute(LABEL_ATTRIBUTE, AUSTRIA_LABEL);
+  await expect(groups.nth(1).locator('option').first()).toHaveText(AUSTRIA_NATIONWIDE_LABEL);
+});
 
 test('stores the holiday region and shows it when reopening', async ({ calendar: { page, userData } }) => {
   await saveSettings(page, { region: HOLIDAY_REGION });
@@ -208,19 +222,28 @@ test.describe('animation', () => {
 });
 
 test.describe('city suggestions', () => {
-  test('suggests matching cities with region and country while typing', async ({ calendar: { page } }) => {
+  test('opens the full list from the trigger and filters it with region and country while typing', async ({ calendar: { page } }) => {
     await openSettings(page);
     const cityInput = page.locator(SETTINGS_SELECTORS.CITY);
+    const picker = page.locator(SETTINGS_SELECTORS.CITY_PICKER);
     const options = page.locator(SETTINGS_SELECTORS.CITY_OPTION);
 
+    await page.locator(SETTINGS_SELECTORS.CITY_TRIGGER).click();
+    await expect(picker).toBeVisible();
+    await expect(cityInput).toBeFocused();
+    await expect(options.first().locator(SETTINGS_SELECTORS.CITY_OPTION_NAME)).toHaveText(LARGEST_LOCAL_CITY);
+    await expect(options).toHaveCount(RENDERED_WINDOW);
+    await page.locator(SETTINGS_SELECTORS.CITY_TRIGGER).click();
+    await expect(picker).toBeHidden();
+
     await cityInput.fill(CITY_QUERY);
-    await expect(page.locator(SETTINGS_SELECTORS.CITY_PICKER)).toBeVisible();
+    await expect(picker).toBeVisible();
     await expect(cityInput).toHaveAttribute(SUGGESTION_ATTRIBUTE, EXPANDED);
     await expect(options.first().locator(SETTINGS_SELECTORS.CITY_OPTION_NAME)).toHaveText(SEEDED_CITY);
     await expect(options.first().locator(SETTINGS_SELECTORS.CITY_OPTION_DETAILS)).toHaveText(HAMBURG_DETAILS);
 
     await cityInput.fill(AMBIGUOUS_QUERY);
-    await expect(options).toHaveCount(MAX_SUGGESTIONS);
+    await expect(options.first().locator(SETTINGS_SELECTORS.CITY_OPTION_NAME)).toContainText(AMBIGUOUS_QUERY);
 
     await cityInput.fill(UNKNOWN_QUERY);
     await expect(page.locator(SETTINGS_SELECTORS.CITY_PICKER)).toBeHidden();

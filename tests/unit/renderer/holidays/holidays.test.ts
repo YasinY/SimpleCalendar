@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toIsoDate } from '@renderer/date/dateUtils';
-import { buildHolidayMap, getEasterSunday, getRepentanceDay } from '@renderer/holidays/holidayDates';
+import { buildHolidayMap, getEasterSunday, getNthSunday, getRepentanceDay } from '@renderer/holidays/holidayDates';
 
 function findDate(map: Map<string, string[]>, name: string): string | undefined {
   for (const [iso, names] of map) {
@@ -45,6 +45,42 @@ describe('holidays', () => {
 
   it('collects both names when two holidays fall on the same day', () => {
     expect(buildHolidayMap([2008], '').get('2008-05-01')).toEqual(['Tag der Arbeit', 'Christi Himmelfahrt']);
+  });
+
+  it.each([
+    [2026, 9, 1, '2026-09-06'],
+    [2026, 9, 3, '2026-09-20'],
+    [2027, 9, 1, '2027-09-05'],
+    [2024, 12, 1, '2024-12-01']
+  ])('computes the nth sunday of %i-%i (%i)', (year, month, ordinal, expected) => {
+    expect(toIsoDate(getNthSunday(year, month, ordinal))).toBe(expected);
+  });
+
+  it('returns the austrian nationwide holidays and adds state holidays', () => {
+    const austria = buildHolidayMap([2026], 'AT');
+    expect(austria.size).toBe(13);
+    expect(austria.get('2026-10-26')).toEqual(['Nationalfeiertag']);
+    expect(findDate(austria, 'Leopold')).toBeUndefined();
+    expect(findDate(buildHolidayMap([2026], 'AT-9'), 'Leopold')).toBe('2026-11-15');
+    expect(findDate(buildHolidayMap([2026], 'AT-2'), 'Tag der Volksabstimmung')).toBe('2026-10-10');
+  });
+
+  it('returns only the holidays shared by every swiss canton for the whole country', () => {
+    const switzerland = buildHolidayMap([2026], 'CH');
+    expect(switzerland.size).toBe(4);
+    expect(switzerland.get('2026-08-01')).toEqual(['Bundesfeiertag']);
+    expect(findDate(switzerland, 'Karfreitag')).toBeUndefined();
+  });
+
+  it('resolves sunday relative cantonal holidays', () => {
+    expect(findDate(buildHolidayMap([2026], 'CH-GE'), 'Jeûne genevois')).toBe('2026-09-10');
+    expect(findDate(buildHolidayMap([2026], 'CH-VD'), 'Bettagsmontag')).toBe('2026-09-21');
+    expect(findDate(buildHolidayMap([2026], 'CH-VS'), 'Karfreitag')).toBeUndefined();
+    expect(findDate(buildHolidayMap([2026], 'CH-ZH'), 'Karfreitag')).toBe('2026-04-03');
+  });
+
+  it('returns nothing for an unknown region', () => {
+    expect(buildHolidayMap([2026], 'XX').size).toBe(0);
   });
 
   it('covers every requested year', () => {

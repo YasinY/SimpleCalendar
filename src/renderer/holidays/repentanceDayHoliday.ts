@@ -1,4 +1,4 @@
-import type { HOLIDAY_RULE } from './holidayConstants';
+import type { HOLIDAY_RULE } from './holidayRule';
 
 export interface RepentanceDayHoliday {
   name: string;

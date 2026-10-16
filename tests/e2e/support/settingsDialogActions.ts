@@ -8,6 +8,7 @@ export const SETTINGS_SELECTORS = {
   THEME: '[data-settings-theme]',
   CITY: '[data-settings-city]',
   CITY_PICKER: '#cityPicker',
+  CITY_TRIGGER: '[data-city-picker-trigger]',
   CITY_OPTION: '#cityPicker .city-picker__option',
   CITY_OPTION_NAME: '.city-picker__name',
   CITY_OPTION_DETAILS: '.city-picker__details',

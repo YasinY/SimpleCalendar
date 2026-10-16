@@ -97,6 +97,10 @@ const HOLIDAYS = {
   ALL_SAINTS: 'Allerheiligen',
   REPENTANCE_ISO: '2026-11-18',
   REPENTANCE: 'Buß- und Bettag',
+  NATIONAL_DAY_ISO: '2026-10-26',
+  NATIONAL_DAY: 'Nationalfeiertag',
+  GENEVA_FAST_ISO: '2026-09-10',
+  GENEVA_FAST: 'Jeûne genevois',
   COLLISION_NOW: '2008-05-01T10:00:00',
   COLLISION_ISO: '2008-05-01',
   COLLISION: 'Tag der Arbeit, Christi Himmelfahrt'
@@ -104,7 +108,9 @@ const HOLIDAYS = {
 
 const REGIONS = {
   BAVARIA: 'BY',
-  SAXONY: 'SN'
+  SAXONY: 'SN',
+  AUSTRIA: 'AT',
+  GENEVA: 'CH-GE'
 } as const;
 
 const TIMES = {
@@ -340,6 +346,26 @@ test.describe('holidays in Bavaria', () => {
     await page.locator(SELECTORS.NEXT).click();
     await expect(dayCell(page, HOLIDAYS.ALL_SAINTS_ISO).locator(CLASSES.HOLIDAY_NAME)).toHaveText(HOLIDAYS.ALL_SAINTS);
     await expect(dayCell(page, HOLIDAYS.REPENTANCE_ISO)).not.toHaveClass(PATTERNS.HOLIDAY_DAY);
+  });
+});
+
+test.describe('holidays in Austria', () => {
+  test.use({ calendarLaunch: { ...DEFAULT_LAUNCH_OPTIONS, settings: { holidayRegion: REGIONS.AUSTRIA } } });
+
+  test('shows the national day instead of the german unity day', async ({ calendar: { page } }) => {
+    await freezeClock(page);
+    await page.locator(SELECTORS.NEXT).click();
+    await expect(dayCell(page, HOLIDAYS.NATIONAL_DAY_ISO).locator(CLASSES.HOLIDAY_NAME)).toHaveText(HOLIDAYS.NATIONAL_DAY);
+    await expect(dayCell(page, HOLIDAYS.UNITY_DAY_ISO)).not.toHaveClass(PATTERNS.HOLIDAY_DAY);
+  });
+});
+
+test.describe('holidays in Geneva', () => {
+  test.use({ calendarLaunch: { ...DEFAULT_LAUNCH_OPTIONS, settings: { holidayRegion: REGIONS.GENEVA } } });
+
+  test('shows the sunday relative fast day', async ({ calendar: { page } }) => {
+    await freezeClock(page);
+    await expect(dayCell(page, HOLIDAYS.GENEVA_FAST_ISO).locator(CLASSES.HOLIDAY_NAME)).toHaveText(HOLIDAYS.GENEVA_FAST);
   });
 });
 

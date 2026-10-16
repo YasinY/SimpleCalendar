@@ -1,7 +1,7 @@
 import { THEME_OPTIONS } from '@renderer/constants';
 import { requireElement } from '@renderer/dom/elements';
-import { fillSelect } from '@renderer/dom/selectOptions';
-import { REGION_OPTIONS } from '@renderer/holidays/holidayConstants';
+import { fillGroupedSelect, fillSelect } from '@renderer/dom/selectOptions';
+import { REGION_GROUPS } from '@renderer/holidays/holidayConstants';
 import { CityPicker } from './cityPicker/CityPicker';
 import { DialogOverlay } from './DialogOverlay';
 import type { CityPickerOptions } from './cityPicker/cityPickerOptions';
@@ -48,7 +48,7 @@ export class SettingsDialog implements SettingsEditor {
     this.#autoUpdateInput = requireElement(overlayElement, SELECTORS.AUTO_UPDATE_INPUT);
     this.#versionLabel = requireElement(overlayElement, SELECTORS.VERSION_LABEL);
     this.#handlers = handlers;
-    fillSelect(this.#regionSelect, REGION_OPTIONS);
+    fillGroupedSelect(this.#regionSelect, REGION_GROUPS);
     fillSelect(this.#themeSelect, THEME_OPTIONS);
     this.#bindInteractions();
   }

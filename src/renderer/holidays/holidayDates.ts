@@ -1,10 +1,13 @@
-import { DAYS_PER_WEEK } from '@renderer/constants';
+import { DAYS_PER_WEEK, FIRST_MONTH_DAY } from '@renderer/constants';
 import { addDays, toIsoDate } from '@renderer/date/dateUtils';
-import { ALL_STATE_CODES, HOLIDAYS, HOLIDAY_RULE } from './holidayConstants';
+import { HOLIDAYS, HOLIDAY_RULE } from './holidayConstants';
+import { findHolidayCountry } from './holidayRegions';
 import type { Holiday } from './holiday';
 
 const HUMAN_MONTH_OFFSET = 1;
 const WEDNESDAY_INDEX = 3;
+const SUNDAY_INDEX = 0;
+const FIRST_ORDINAL = 1;
 const REPENTANCE_DAY_LATEST = { month: 11, day: 22 };
 
 export type HolidayMap = Map<string, string[]>;
@@ -37,6 +40,12 @@ export function getRepentanceDay(year: number): Date {
   return addDays(latestPossible, -daysBack);
 }
 
+export function getNthSunday(year: number, humanMonth: number, ordinal: number): Date {
+  const monthStart = createDate(year, humanMonth, FIRST_MONTH_DAY);
+  const daysUntilSunday = (SUNDAY_INDEX - monthStart.getDay() + DAYS_PER_WEEK) % DAYS_PER_WEEK;
+  return addDays(monthStart, daysUntilSunday + (ordinal - FIRST_ORDINAL) * DAYS_PER_WEEK);
+}
+
 function resolveDate(holiday: Holiday, year: number, easterSunday: Date): Date {
   switch (holiday.rule) {
     case HOLIDAY_RULE.FIXED:
@@ -45,11 +54,15 @@ function resolveDate(holiday: Holiday, year: number, easterSunday: Date): Date {
       return addDays(easterSunday, holiday.easterOffset);
     case HOLIDAY_RULE.REPENTANCE_DAY:
       return getRepentanceDay(year);
+    case HOLIDAY_RULE.SUNDAY_RELATIVE:
+      return addDays(getNthSunday(year, holiday.month, holiday.nthSunday), holiday.dayOffset);
   }
 }
 
-function appliesTo(holiday: Holiday, stateCode: string): boolean {
-  return holiday.regions === ALL_STATE_CODES || holiday.regions.includes(stateCode);
+function appliesTo(holiday: Holiday, regionCode: string): boolean {
+  const country = findHolidayCountry(regionCode);
+  if (country) return country.states.every((state) => holiday.regions.includes(state.code));
+  return holiday.regions.includes(regionCode);
 }
 
 function addHoliday(holidaysByDate: HolidayMap, iso: string, name: string): void {
@@ -61,9 +74,9 @@ function addHoliday(holidaysByDate: HolidayMap, iso: string, name: string): void
   holidaysByDate.set(iso, [name]);
 }
 
-export function buildHolidayMap(years: number[], stateCode: string): HolidayMap {
+export function buildHolidayMap(years: number[], regionCode: string): HolidayMap {
   const holidaysByDate: HolidayMap = new Map();
-  const applicable = HOLIDAYS.filter((holiday) => appliesTo(holiday, stateCode));
+  const applicable = HOLIDAYS.filter((holiday) => appliesTo(holiday, regionCode));
 
   for (const year of years) {
     const easterSunday = getEasterSunday(year);

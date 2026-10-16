@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCityDetails, normalizeCityText, searchCities, toCity, toIndexedCity, toWeatherLocation } from '@renderer/weather/citySearch';
+import { formatCityDetails, normalizeCityText, searchCities, sortLocalFirst, toCity, toIndexedCity, toWeatherLocation } from '@renderer/weather/citySearch';
 import type { CityRow } from '@renderer/weather/cityRow';
 
 const ROWS: Record<string, CityRow> = {
@@ -12,11 +12,11 @@ const ROWS: Record<string, CityRow> = {
 };
 
 const INDEX = [ROWS.SINGAPORE, ROWS.BERLIN, ROWS.HAMBURG, ROWS.MUNICH, ROWS.GIESSEN, ROWS.HAMBURG_US].map(toIndexedCity);
-const LIMIT = 8;
-const SMALL_LIMIT = 1;
 const QUERIES = { HAM: 'ham', PADDED_HAM: '  Ham ', MUEN: 'muen', MUN: 'mün', BURG: 'burg', EMPTY: '', BLANK: '   ', UNKNOWN: 'xyz' } as const;
 const NORMALIZED = { MUNICH: 'munchen', GIESSEN: 'giessen', MUNICH_TRANSLITERATED: 'muenchen' } as const;
 const DETAILS = { MUNICH: 'Bayern, Deutschland', SINGAPORE: 'Singapur' } as const;
+const ALL_NAMES = ['Singapore', 'Berlin', 'Hamburg', 'München', 'Gießen', 'Hamburg'];
+const LOCAL_FIRST_NAMES = ['Berlin', 'Hamburg', 'München', 'Gießen', 'Singapore', 'Hamburg'];
 
 function names(rows: ReturnType<typeof searchCities>): string[] {
   return rows.map((city) => city.name);
@@ -33,23 +33,29 @@ describe('citySearch', () => {
     expect(toIndexedCity(ROWS.MUNICH).searchKeys).toEqual([NORMALIZED.MUNICH, NORMALIZED.MUNICH_TRANSLITERATED]);
   });
 
+  it('moves german speaking countries to the front while keeping the order within each group', () => {
+    expect(sortLocalFirst(INDEX).map(({ city }) => city.name)).toEqual(LOCAL_FIRST_NAMES);
+  });
+
+  it('lists every city for a blank query', () => {
+    expect(names(searchCities(INDEX, QUERIES.EMPTY))).toEqual(ALL_NAMES);
+    expect(names(searchCities(INDEX, QUERIES.BLANK))).toEqual(ALL_NAMES);
+  });
+
   it('lists prefix matches in index order before contains matches', () => {
-    expect(names(searchCities(INDEX, QUERIES.HAM, LIMIT))).toEqual(['Hamburg', 'Hamburg']);
-    expect(names(searchCities(INDEX, QUERIES.BURG, LIMIT))).toEqual(['Hamburg', 'Hamburg']);
-    expect(searchCities(INDEX, QUERIES.HAM, LIMIT)[0].country).toBe('DE');
+    expect(names(searchCities(INDEX, QUERIES.HAM))).toEqual(['Hamburg', 'Hamburg']);
+    expect(names(searchCities(INDEX, QUERIES.BURG))).toEqual(['Hamburg', 'Hamburg']);
+    expect(searchCities(INDEX, QUERIES.HAM)[0].country).toBe('DE');
   });
 
   it('matches umlauts typed as transliteration or with diacritics and trims the query', () => {
-    expect(names(searchCities(INDEX, QUERIES.MUEN, LIMIT))).toEqual(['München']);
-    expect(names(searchCities(INDEX, QUERIES.MUN, LIMIT))).toEqual(['München']);
-    expect(names(searchCities(INDEX, QUERIES.PADDED_HAM, LIMIT))).toEqual(['Hamburg', 'Hamburg']);
+    expect(names(searchCities(INDEX, QUERIES.MUEN))).toEqual(['München']);
+    expect(names(searchCities(INDEX, QUERIES.MUN))).toEqual(['München']);
+    expect(names(searchCities(INDEX, QUERIES.PADDED_HAM))).toEqual(['Hamburg', 'Hamburg']);
   });
 
-  it('stops at the limit and returns nothing for blank or unknown queries', () => {
-    expect(names(searchCities(INDEX, QUERIES.HAM, SMALL_LIMIT))).toEqual(['Hamburg']);
-    expect(searchCities(INDEX, QUERIES.EMPTY, LIMIT)).toEqual([]);
-    expect(searchCities(INDEX, QUERIES.BLANK, LIMIT)).toEqual([]);
-    expect(searchCities(INDEX, QUERIES.UNKNOWN, LIMIT)).toEqual([]);
+  it('returns nothing for unknown queries', () => {
+    expect(searchCities(INDEX, QUERIES.UNKNOWN)).toEqual([]);
   });
 
   it('formats region and german country name, skipping an empty region', () => {

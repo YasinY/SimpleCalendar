@@ -127,6 +127,7 @@
   --time-picker-option-height: 34px;
   --time-picker-visible-options: 7;
   --field-disabled-opacity: 0.4;
+  --city-picker-visible-options: 8;
   --date-picker-width: 292px;
   --date-picker-cell: 34px;
   --date-picker-disabled-opacity: 0.4;
@@ -1164,6 +1165,18 @@ html[data-transition="switch"]::view-transition-new(calendar) {
   background-color: var(--color-canvas);
 }
 
+.field__input--select optgroup {
+  padding: var(--space-xxs) 0;
+  color: var(--color-ink-muted-48);
+  font-size: var(--text-fine-print-size);
+  font-weight: var(--text-fine-print-weight);
+  letter-spacing: var(--text-fine-print-tracking);
+}
+
+.field__input--select optgroup option {
+  color: var(--color-ink);
+}
+
 .field__input--select option {
   padding: var(--option-padding);
   border-radius: var(--rounded-sm);
@@ -1385,21 +1398,26 @@ html[data-transition="switch"]::view-transition-new(calendar) {
   position-anchor: --picker-field;
   position-area: block-end;
   width: anchor-size(width);
+  max-height: calc(var(--city-picker-visible-options) * var(--city-option-height) + 2 * var(--space-xxs));
   padding: var(--space-xxs);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-hairline) transparent;
   transform-origin: top center;
 }
 
-.city-picker:popover-open {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xxs);
+.city-picker__spacer {
+  flex: none;
 }
 
 .city-picker__option {
+  box-sizing: border-box;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-xs);
+  height: var(--city-option-height);
   padding: var(--option-padding);
   border-radius: var(--rounded-sm);
   cursor: default;

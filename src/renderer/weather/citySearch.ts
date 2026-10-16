@@ -5,6 +5,7 @@ import {
   COMBINING_MARKS,
   COUNTRY_NAME_LOCALE,
   COUNTRY_NAME_TYPE,
+  LOCAL_COUNTRIES,
   NO_CITY_TEXT,
   SHARP_S,
   SHARP_S_REPLACEMENT,
@@ -45,17 +46,24 @@ export function toIndexedCity(row: CityRow): IndexedCity {
   return { city, searchKeys: [stripDiacritics(lowerName), stripDiacritics(transliterateUmlauts(lowerName))] };
 }
 
-export function searchCities(index: CityIndex, query: string, limit: number): City[] {
+function isLocal(city: City): boolean {
+  return LOCAL_COUNTRIES.includes(city.country);
+}
+
+export function sortLocalFirst(index: CityIndex): CityIndex {
+  return [...index.filter(({ city }) => isLocal(city)), ...index.filter(({ city }) => !isLocal(city))];
+}
+
+export function searchCities(index: CityIndex, query: string): City[] {
   const needle = normalizeCityText(query.trim());
-  if (needle === NO_CITY_TEXT) return [];
+  if (needle === NO_CITY_TEXT) return index.map(({ city }) => city);
   const prefixMatches: City[] = [];
   const containsMatches: City[] = [];
   for (const { city, searchKeys } of index) {
-    if (prefixMatches.length >= limit) break;
     if (searchKeys.some((key) => key.startsWith(needle))) prefixMatches.push(city);
     else if (searchKeys.some((key) => key.includes(needle))) containsMatches.push(city);
   }
-  return [...prefixMatches, ...containsMatches].slice(0, limit);
+  return [...prefixMatches, ...containsMatches];
 }
 
 export function formatCityDetails(city: City): string {
