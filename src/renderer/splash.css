@@ -40,7 +40,8 @@
   --assemble-duration: 720ms;
   --breathe-duration: 1800ms;
   --assemble-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --breathe-strength: 0.4;
+  --breathe-strength: 0.1;
+  --breathe-opacity: 0.72;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -187,10 +188,12 @@ body {
 @keyframes breathe {
   0%,
   100% {
+    opacity: 1;
     transform: none;
   }
 
   50% {
+    opacity: var(--breathe-opacity);
     transform: translate(calc(var(--scatter-x) * var(--breathe-strength)), calc(var(--scatter-y) * var(--breathe-strength)))
       rotate(calc(var(--scatter-rotate) * var(--breathe-strength)));
   }
