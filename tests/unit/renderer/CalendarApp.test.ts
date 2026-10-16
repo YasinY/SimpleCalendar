@@ -51,6 +51,7 @@ const NATIONAL_HOLIDAY_ISO = '2026-10-03';
 const WEATHER_CITY = 'Hamburg';
 const OTHER_CITY = 'München';
 const WEATHER_LOCATION: WeatherLocation = { city: WEATHER_CITY, name: WEATHER_CITY, latitude: 53.55, longitude: 9.99 };
+const OTHER_LOCATION: WeatherLocation = { city: OTHER_CITY, name: OTHER_CITY, latitude: 48.14, longitude: 11.58 };
 const ACTIVE_VIEW_CLASS = 'segmented__button--active';
 
 const VIEW_MODES = { MONTH: 'month', WEEK: 'week', DAY: 'day' } as const;
@@ -82,6 +83,7 @@ const SETTINGS_PATCH: SettingsPatch = {
   holidayRegion: DEFAULT_SETTINGS.holidayRegion,
   theme: DEFAULT_SETTINGS.theme,
   weatherCity: WEATHER_CITY,
+  weatherLocation: WEATHER_LOCATION,
   autoUpdate: DEFAULT_SETTINGS.autoUpdate
 };
 const NEW_EVENT_INPUT: EventInput = { date: TODAY_ISO, time: SLOT_TIME, title: EVENT_TITLE };
@@ -168,7 +170,7 @@ describe('CalendarApp', () => {
       expect(api.getSettings).toHaveBeenCalledOnce();
       expect(doubles.timeGridView.start).toHaveBeenCalledOnce();
       expect(doubles.weather.start).toHaveBeenCalledOnce();
-      expect(doubles.weather.configure).toHaveBeenCalledExactlyOnceWith(WEATHER_CITY, WEATHER_LOCATION);
+      expect(doubles.weather.configure).toHaveBeenCalledExactlyOnceWith(WEATHER_LOCATION);
     });
 
     it('renders the month view with grid, grouped events and holidays', async () => {
@@ -552,19 +554,13 @@ describe('CalendarApp', () => {
       expect(doubles.weather.configure).toHaveBeenCalledOnce();
     });
 
-    it('reconfigures the weather when the city changes', async () => {
+    it('reconfigures the weather when the location changes', async () => {
       await startApp();
-      doubles.settingsHandlers().onSave({ ...SETTINGS_PATCH, weatherCity: OTHER_CITY });
+      doubles.settingsHandlers().onSave({ ...SETTINGS_PATCH, weatherCity: OTHER_CITY, weatherLocation: OTHER_LOCATION });
       await flushPromises();
       expect(doubles.settingsDialog.close).toHaveBeenCalledOnce();
       expect(doubles.weather.configure).toHaveBeenCalledTimes(2);
-      expect(doubles.weather.configure).toHaveBeenLastCalledWith(OTHER_CITY, WEATHER_LOCATION);
-    });
-
-    it('stores a resolved weather location', async () => {
-      await startApp();
-      doubles.weatherOptions().onLocationResolved(WEATHER_LOCATION);
-      expect(api.updateSettings).toHaveBeenCalledExactlyOnceWith({ weatherLocation: WEATHER_LOCATION });
+      expect(doubles.weather.configure).toHaveBeenLastCalledWith(OTHER_LOCATION);
     });
   });
 });

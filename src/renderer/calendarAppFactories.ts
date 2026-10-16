@@ -9,7 +9,6 @@ import type { MonthRenderer } from './views/monthRenderer';
 import type { MonthViewHandlers } from './views/monthViewHandlers';
 import type { TimeGridHandlers } from './views/timeGridHandlers';
 import type { TimeGridRenderer } from './views/timeGridRenderer';
-import type { WeatherBadgeOptions } from './weather/weatherBadgeOptions';
 import type { WeatherPresenter } from './weather/weatherPresenter';
 
 export interface CalendarAppFactories {
@@ -18,6 +17,6 @@ export interface CalendarAppFactories {
   createEventDialog(handlers: EventDialogHandlers): EventEditor;
   createSettingsDialog(handlers: SettingsDialogHandlers): SettingsEditor;
   createScopePrompt(): ScopeChooser;
-  createWeatherBadge(options: WeatherBadgeOptions): WeatherPresenter;
+  createWeatherBadge(): WeatherPresenter;
   createDayChangeWatcher(handlers: DayChangeHandlers): DayChangeNotifier;
 }

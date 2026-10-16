@@ -1,5 +1,5 @@
 import { requireElement } from '@renderer/dom/elements';
-import { fetchCurrentWeather, geocodeCity, resolveCondition } from './weatherApi';
+import { fetchCurrentWeather, resolveCondition } from './weatherApi';
 import {
   TEMPERATURE_SUFFIX,
   WEATHER_ICONS,
@@ -8,7 +8,6 @@ import {
   WEATHER_TOOLTIP_SEPARATOR
 } from './weatherConstants';
 import type { CurrentWeather } from './currentWeather';
-import type { WeatherBadgeOptions } from './weatherBadgeOptions';
 import type { WeatherPresenter } from './weatherPresenter';
 import type { WeatherLocation } from '@shared/weatherLocation';
 
@@ -26,16 +25,14 @@ export class WeatherBadge implements WeatherPresenter {
   readonly #iconElement: HTMLElement;
   readonly #temperatureElement: HTMLElement;
   readonly #labelElement: HTMLElement;
-  readonly #onLocationResolved: (location: WeatherLocation) => void;
   #location: WeatherLocation | null = null;
   #lastFetchedAt = NEVER_FETCHED;
 
-  constructor(element: HTMLElement, { onLocationResolved }: WeatherBadgeOptions) {
+  constructor(element: HTMLElement) {
     this.#element = element;
     this.#iconElement = requireElement(element, SELECTORS.ICON);
     this.#temperatureElement = requireElement(element, SELECTORS.TEMPERATURE);
     this.#labelElement = requireElement(element, SELECTORS.LABEL);
-    this.#onLocationResolved = onLocationResolved;
   }
 
   start(): void {
@@ -43,27 +40,11 @@ export class WeatherBadge implements WeatherPresenter {
     setInterval(() => void this.#refresh(), WEATHER_REFRESH_INTERVAL_MS);
   }
 
-  async configure(city: string, cachedLocation: WeatherLocation | null): Promise<void> {
-    this.#location = null;
+  async configure(location: WeatherLocation | null): Promise<void> {
+    this.#location = location;
     this.#lastFetchedAt = NEVER_FETCHED;
     this.#element.hidden = true;
-    if (!city) return;
-
-    this.#location = await this.#resolveLocation(city, cachedLocation);
-    if (!this.#location) return;
     await this.#refresh();
-  }
-
-  async #resolveLocation(city: string, cachedLocation: WeatherLocation | null): Promise<WeatherLocation | null> {
-    if (cachedLocation?.city === city) return cachedLocation;
-    try {
-      const location = await geocodeCity(city);
-      if (location) this.#onLocationResolved(location);
-      return location;
-    } catch (error) {
-      console.warn('weather geocoding failed', error);
-      return null;
-    }
   }
 
   async #refresh(): Promise<void> {

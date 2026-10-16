@@ -150,6 +150,8 @@
   --prompt-layer: 20;
   --traffic-light-glyph-length: 6px;
   --traffic-light-glyph-thickness: 1.5px;
+  --traffic-light-maximize-glyph: 4px;
+  --traffic-light-maximize-inset: 2px;
   --frosted-filter: saturate(180%) blur(20px);
 
   --hours-column-width: 56px;
@@ -312,6 +314,27 @@ body {
 
 .traffic-light--maximize {
   background-color: var(--color-traffic-maximize);
+}
+
+.traffic-light--maximize::before,
+.traffic-light--maximize::after {
+  content: "";
+  position: absolute;
+  width: var(--traffic-light-maximize-glyph);
+  height: var(--traffic-light-maximize-glyph);
+  background-color: var(--traffic-light-glyph);
+}
+
+.traffic-light--maximize::before {
+  top: var(--traffic-light-maximize-inset);
+  left: var(--traffic-light-maximize-inset);
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+.traffic-light--maximize::after {
+  right: var(--traffic-light-maximize-inset);
+  bottom: var(--traffic-light-maximize-inset);
+  clip-path: polygon(100% 100%, 100% 0, 0 100%);
 }
 
 .traffic-light:active {
@@ -1211,6 +1234,7 @@ html[data-transition="switch"]::view-transition-new(calendar) {
   position: relative;
   display: flex;
   min-width: 0;
+  anchor-name: --picker-field;
 }
 
 .field__input--picker {
@@ -1302,10 +1326,11 @@ html[data-transition="switch"]::view-transition-new(calendar) {
 }
 
 .time-picker {
-  position-area: block-end span-inline-end;
+  position-anchor: --picker-field;
+  position-area: block-end;
   gap: var(--space-xxs);
   padding: var(--space-xxs);
-  transform-origin: top left;
+  transform-origin: top center;
 }
 
 .time-picker:popover-open {
@@ -1354,6 +1379,62 @@ html[data-transition="switch"]::view-transition-new(calendar) {
 .time-picker__option:focus-visible {
   outline: 2px solid var(--color-primary-focus);
   outline-offset: 1px;
+}
+
+.city-picker {
+  position-anchor: --picker-field;
+  position-area: block-end;
+  width: anchor-size(width);
+  padding: var(--space-xxs);
+  transform-origin: top center;
+}
+
+.city-picker:popover-open {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.city-picker__option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  padding: var(--option-padding);
+  border-radius: var(--rounded-sm);
+  cursor: default;
+}
+
+.city-picker__option:hover {
+  background-color: var(--color-canvas-parchment);
+}
+
+.city-picker__option--active,
+.city-picker__option--active:hover {
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.city-picker__name {
+  flex: none;
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-caption-strong-weight);
+  letter-spacing: var(--text-caption-tracking);
+}
+
+.city-picker__details {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-muted-48);
+  font-size: var(--text-fine-print-size);
+  letter-spacing: var(--text-fine-print-tracking);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.city-picker__option--active .city-picker__details {
+  color: inherit;
+  opacity: var(--event-time-opacity);
 }
 
 .date-picker__header {
@@ -1513,7 +1594,8 @@ html[data-transition="picker-backward"]::view-transition-new(date-picker-grid) {
 .picker-field__trigger,
 .date-picker__nav,
 .date-picker__action,
-.time-picker__option {
+.time-picker__option,
+.city-picker__option {
   transition: background-color var(--hover-duration) ease-out, color var(--hover-duration) ease-out;
 }
 
@@ -1528,7 +1610,8 @@ html[data-transition="picker-backward"]::view-transition-new(date-picker-grid) {
   .picker-field__trigger,
   .date-picker__nav,
   .date-picker__action,
-  .time-picker__option {
+  .time-picker__option,
+  .city-picker__option {
     transition: none;
   }
 }

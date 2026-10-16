@@ -1,13 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchCurrentWeather, geocodeCity, resolveCondition } from '@renderer/weather/weatherApi';
-import {
-  FORECAST_ENDPOINT,
-  FORECAST_PARAMS,
-  GEOCODING_ENDPOINT,
-  GEOCODING_PARAMS,
-  UNKNOWN_CONDITION,
-  WEATHER_CONDITIONS
-} from '@renderer/weather/weatherConstants';
+import { fetchCurrentWeather, resolveCondition } from '@renderer/weather/weatherApi';
+import { FORECAST_ENDPOINT, FORECAST_PARAMS, UNKNOWN_CONDITION, WEATHER_CONDITIONS } from '@renderer/weather/weatherConstants';
 import type { WeatherLocation } from '@shared/weatherLocation';
 
 const CITY = 'muenchen';
@@ -42,25 +35,6 @@ describe('weatherApi', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
-  });
-
-  it('geocodes a city to the first result', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ results: [{ name: RESOLVED_NAME, latitude: LATITUDE, longitude: LONGITUDE }] }));
-    await expect(geocodeCity(CITY)).resolves.toEqual(LOCATION);
-
-    const url = readRequestedUrl(fetchMock);
-    expect(url.origin + url.pathname).toBe(GEOCODING_ENDPOINT);
-    expectQuery(url, { ...GEOCODING_PARAMS, name: CITY });
-  });
-
-  it('returns null when the geocoding response has no results', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({}));
-    await expect(geocodeCity(CITY)).resolves.toBeNull();
-  });
-
-  it('returns null when the geocoding results are empty', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ results: [] }));
-    await expect(geocodeCity(CITY)).resolves.toBeNull();
   });
 
   it('fetches the current weather for a location', async () => {

@@ -25,6 +25,7 @@ import type { MonthRenderer } from './views/monthRenderer';
 import type { MoveTarget } from './views/moveTarget';
 import type { SegmentsByDate } from './views/segmentsByDate';
 import type { TimeGridRenderer } from './views/timeGridRenderer';
+import { isSameWeatherLocation } from './weather/weatherLocationEquality';
 import type { WeatherPresenter } from './weather/weatherPresenter';
 import { DEFAULT_SETTINGS } from '@shared/settingsDefaults';
 import type { CalendarApi } from '@shared/calendarApi';
@@ -80,9 +81,7 @@ export class CalendarApp {
 
     this.#scopePrompt = factories.createScopePrompt();
 
-    this.#weather = factories.createWeatherBadge({
-      onLocationResolved: (location) => void this.#api.updateSettings({ weatherLocation: location })
-    });
+    this.#weather = factories.createWeatherBadge();
 
     this.#dayChangeWatcher = factories.createDayChangeWatcher({
       onDayChange: (previousDay, today) => void this.#followDayChange(previousDay, today)
@@ -101,7 +100,7 @@ export class CalendarApp {
     this.#timeGridView.start();
     this.#dayChangeWatcher.start();
     this.#weather.start();
-    void this.#weather.configure(this.#settings.weatherCity, this.#settings.weatherLocation);
+    void this.#weather.configure(this.#settings.weatherLocation);
     await this.#reloadEvents();
   }
 
@@ -203,11 +202,11 @@ export class CalendarApp {
   }
 
   async #saveSettings(patch: SettingsPatch): Promise<void> {
-    const cityChanged = patch.weatherCity !== this.#settings.weatherCity;
+    const locationChanged = !isSameWeatherLocation(patch.weatherLocation, this.#settings.weatherLocation);
     this.#settings = await this.#api.updateSettings(patch);
     this.#settingsDialog.close();
     this.#render();
-    if (cityChanged) void this.#weather.configure(this.#settings.weatherCity, this.#settings.weatherLocation);
+    if (locationChanged) void this.#weather.configure(this.#settings.weatherLocation);
   }
 
   async #reloadEvents(direction?: TransitionDirection): Promise<void> {

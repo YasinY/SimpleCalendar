@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCalendarApp } from '@renderer/createCalendarApp';
 import { toEventKey } from '@renderer/events/eventKey';
-import { fetchCurrentWeather, geocodeCity } from '@renderer/weather/weatherApi';
+import { fetchCurrentWeather } from '@renderer/weather/weatherApi';
 import { DEFAULT_SETTINGS } from '@shared/settingsDefaults';
 import type { CalendarEvent } from '@shared/calendarEvent';
 import type { Recurrence } from '@shared/recurrence';
@@ -13,9 +13,10 @@ import { mountIndexDocument, requireById } from '@tests/support/indexDocument';
 
 vi.mock('@renderer/weather/weatherApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@renderer/weather/weatherApi')>()),
-  geocodeCity: vi.fn(),
   fetchCurrentWeather: vi.fn()
 }));
+
+vi.mock('@renderer/weather/cities', () => ({ default: [['Hamburg', 'Hamburg', 'DE', 53.55, 9.99, 1800000]] }));
 
 const NOW = new Date(2026, 8, 16, 12, 0);
 const TODAY_ISO = '2026-09-16';
@@ -69,6 +70,7 @@ const SELECTORS = {
   EVENT_BLOCK: '.event--block',
   SETTINGS_FORM: '[data-settings-form]',
   SETTINGS_CITY: '[data-settings-city]',
+  CITY_OPTION: '.city-picker__option',
   DIALOG_FORM: '[data-dialog-form]',
   DIALOG_TITLE: '[data-dialog-title]',
   DIALOG_TIME: '[data-dialog-time]',
@@ -182,7 +184,6 @@ describe('CalendarApp', () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     mountIndexDocument();
-    vi.mocked(geocodeCity).mockResolvedValue(WEATHER_LOCATION);
     vi.mocked(fetchCurrentWeather).mockResolvedValue(CURRENT_WEATHER);
   });
 
@@ -221,10 +222,9 @@ describe('CalendarApp', () => {
       expect(lastRequestedRange()).toEqual(RANGES.TODAY);
     });
 
-    it('stores the resolved weather location when a city is configured', async () => {
-      await startApp({ weatherCity: WEATHER_CITY });
-      expect(geocodeCity).toHaveBeenCalledWith(WEATHER_CITY);
-      expect(api.updateSettings).toHaveBeenCalledWith({ weatherLocation: WEATHER_LOCATION });
+    it('fetches the weather for the stored location', async () => {
+      await startApp({ weatherCity: WEATHER_CITY, weatherLocation: WEATHER_LOCATION });
+      expect(fetchCurrentWeather).toHaveBeenCalledWith(WEATHER_LOCATION);
     });
   });
 
@@ -304,17 +304,19 @@ describe('CalendarApp', () => {
       expect(api.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ weatherCity: DEFAULT_SETTINGS.weatherCity }));
       expect(isHidden(ELEMENT_IDS.SETTINGS_OVERLAY)).toBe(true);
       expect(titleText().main).toBe(TITLES.SEPTEMBER);
-      expect(geocodeCity).not.toHaveBeenCalled();
+      expect(fetchCurrentWeather).not.toHaveBeenCalled();
     });
 
-    it('reconfigures the weather when the city changes', async () => {
+    it('reconfigures the weather with the city picked from the bundled catalog', async () => {
       await startApp();
       await click(requireById(ELEMENT_IDS.SETTINGS_BUTTON));
-      query<HTMLInputElement>(SELECTORS.SETTINGS_CITY).value = WEATHER_CITY;
+      const cityInput = query<HTMLInputElement>(SELECTORS.SETTINGS_CITY);
+      cityInput.value = WEATHER_CITY;
+      cityInput.dispatchEvent(new Event('input'));
+      await vi.waitFor(() => expect(document.querySelector(SELECTORS.CITY_OPTION)).not.toBeNull());
       await submit(query(SELECTORS.SETTINGS_FORM));
-      expect(api.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ weatherCity: WEATHER_CITY }));
-      expect(geocodeCity).toHaveBeenCalledWith(WEATHER_CITY);
-      expect(api.updateSettings).toHaveBeenCalledWith({ weatherLocation: WEATHER_LOCATION });
+      expect(api.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ weatherCity: WEATHER_CITY, weatherLocation: WEATHER_LOCATION }));
+      expect(fetchCurrentWeather).toHaveBeenCalledWith(WEATHER_LOCATION);
     });
   });
 

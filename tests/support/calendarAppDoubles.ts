@@ -12,7 +12,6 @@ import type { MonthRenderer } from '@renderer/views/monthRenderer';
 import type { MonthViewHandlers } from '@renderer/views/monthViewHandlers';
 import type { TimeGridHandlers } from '@renderer/views/timeGridHandlers';
 import type { TimeGridRenderer } from '@renderer/views/timeGridRenderer';
-import type { WeatherBadgeOptions } from '@renderer/weather/weatherBadgeOptions';
 import type { WeatherPresenter } from '@renderer/weather/weatherPresenter';
 import type { CalendarApi } from '@shared/calendarApi';
 import type { CalendarEvent } from '@shared/calendarEvent';
@@ -51,7 +50,6 @@ export interface CalendarAppDoubles {
   timeGridHandlers(): TimeGridHandlers;
   eventDialogHandlers(): EventDialogHandlers;
   settingsHandlers(): SettingsDialogHandlers;
-  weatherOptions(): WeatherBadgeOptions;
   dayChangeHandlers(): DayChangeHandlers;
 }
 
@@ -106,7 +104,6 @@ export function createCalendarAppDoubles(): CalendarAppDoubles {
   let timeGridHandlers: TimeGridHandlers | undefined;
   let eventDialogHandlers: EventDialogHandlers | undefined;
   let settingsHandlers: SettingsDialogHandlers | undefined;
-  let weatherOptions: WeatherBadgeOptions | undefined;
   let dayChangeHandlers: DayChangeHandlers | undefined;
 
   const monthView: MonthViewDouble = { element: document.createElement(ELEMENT_TAGS.CONTAINER), render: vi.fn() };
@@ -135,10 +132,7 @@ export function createCalendarAppDoubles(): CalendarAppDoubles {
       return settingsDialog;
     },
     createScopePrompt: () => scopePrompt,
-    createWeatherBadge: (options) => {
-      weatherOptions = options;
-      return weather;
-    },
+    createWeatherBadge: () => weather,
     createDayChangeWatcher: (handlers) => {
       dayChangeHandlers = handlers;
       return dayChangeWatcher;
@@ -158,7 +152,6 @@ export function createCalendarAppDoubles(): CalendarAppDoubles {
     timeGridHandlers: () => requireCaptured(timeGridHandlers),
     eventDialogHandlers: () => requireCaptured(eventDialogHandlers),
     settingsHandlers: () => requireCaptured(settingsHandlers),
-    weatherOptions: () => requireCaptured(weatherOptions),
     dayChangeHandlers: () => requireCaptured(dayChangeHandlers)
   };
 }

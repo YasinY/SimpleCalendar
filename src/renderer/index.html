@@ -173,10 +173,13 @@
         <select class="field__input field__input--select" data-settings-theme></select>
       </label>
 
-      <label class="field">
-        <span class="field__label">Stadt für das Wetter (leer lassen für aus)</span>
-        <input class="field__input" type="text" data-settings-city maxlength="80" placeholder="z. B. Hamburg">
-      </label>
+      <div class="field">
+        <label class="field__label" for="settingsCity">Stadt für das Wetter (leer lassen für aus)</label>
+        <div class="picker-field" data-settings-city-field>
+          <input class="field__input" id="settingsCity" type="text" role="combobox" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="cityPicker" data-settings-city maxlength="80" placeholder="z. B. Hamburg">
+          <div class="picker city-picker" id="cityPicker" popover="manual" role="listbox" aria-label="Städtevorschläge" data-city-picker></div>
+        </div>
+      </div>
 
       <div class="field">
         <label class="checkbox">

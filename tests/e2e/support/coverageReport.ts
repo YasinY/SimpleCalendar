@@ -8,6 +8,7 @@ const REPORT_NAME = 'SimpleCalendar E2E';
 const BUNDLE_PATH_PATTERN = /[\\/]out[\\/](main|renderer)[\\/]/;
 const SOURCE_PATH_PATTERN = /(^|[\\/])src[\\/](main|renderer|shared)[\\/]/;
 const NODE_MODULES_SEGMENT = 'node_modules';
+const GENERATED_CITIES_FILE = 'cities.js';
 const SOURCE_ROOT = 'src/';
 const UNCOVERED_COUNT = 0;
 const LINE_LIST_SEPARATOR = ', ';
@@ -95,7 +96,7 @@ export async function generateCoverageReport(): Promise<void> {
     name: REPORT_NAME,
     outputDir: REPORT_DIR,
     reports: [['v8'], ['console-details'], ['json-summary']],
-    sourceFilter: (sourcePath) => SOURCE_PATH_PATTERN.test(sourcePath) && !sourcePath.includes(NODE_MODULES_SEGMENT),
+    sourceFilter: (sourcePath) => SOURCE_PATH_PATTERN.test(sourcePath) && !sourcePath.includes(NODE_MODULES_SEGMENT) && !sourcePath.endsWith(GENERATED_CITIES_FILE),
     sourcePath: toSourceRelativePath,
     cleanCache: true
   });

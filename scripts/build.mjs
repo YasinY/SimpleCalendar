@@ -33,6 +33,7 @@ const rendererOptions = {
   bundle: true,
   platform: 'browser',
   format: 'esm',
+  splitting: true,
   target: ELECTRON_TARGET,
   sourcemap: true,
   logLevel: 'info'

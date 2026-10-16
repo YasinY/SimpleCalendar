@@ -8,6 +8,7 @@ import { requireElementById } from './dom/elements';
 import { queryCalendarElements } from './dom/queryCalendarElements';
 import { MonthView } from './views/MonthView';
 import { TimeGridView } from './views/TimeGridView';
+import { CityCatalog } from './weather/CityCatalog';
 import { WeatherBadge } from './weather/WeatherBadge';
 import type { CalendarAppFactories } from './calendarAppFactories';
 import type { CalendarApi } from '@shared/calendarApi';
@@ -22,13 +23,14 @@ const OVERLAY_IDS = {
 
 function createFactories(): CalendarAppFactories {
   const discardPrompt = new DiscardPrompt(requireElementById(OVERLAY_IDS.DISCARD_PROMPT));
+  const cityCatalog = new CityCatalog();
   return {
     createMonthView: (handlers) => new MonthView(handlers),
     createTimeGridView: (handlers) => new TimeGridView(handlers),
     createEventDialog: (handlers) => new EventDialog(requireElementById(OVERLAY_IDS.EVENT_DIALOG), handlers, discardPrompt),
-    createSettingsDialog: (handlers) => new SettingsDialog(requireElementById(OVERLAY_IDS.SETTINGS_DIALOG), handlers, discardPrompt),
+    createSettingsDialog: (handlers) => new SettingsDialog(requireElementById(OVERLAY_IDS.SETTINGS_DIALOG), handlers, discardPrompt, { loadCities: () => cityCatalog.load() }),
     createScopePrompt: () => new SeriesScopePrompt(requireElementById(OVERLAY_IDS.SCOPE_PROMPT)),
-    createWeatherBadge: (options) => new WeatherBadge(requireElementById(OVERLAY_IDS.WEATHER_BADGE), options),
+    createWeatherBadge: () => new WeatherBadge(requireElementById(OVERLAY_IDS.WEATHER_BADGE)),
     createDayChangeWatcher: (handlers) => new DayChangeWatcher(handlers)
   };
 }

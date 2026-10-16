@@ -3,16 +3,7 @@ import path from 'node:path';
 import type { Page } from '@playwright/test';
 import { DEFAULT_LAUNCH_OPTIONS, expect, test } from './support/calendarFixture';
 import { saveSettings } from './support/settingsDialogActions';
-import {
-  DEFAULT_COORDINATES,
-  failRoute,
-  FORECAST_ROUTE,
-  GEOCODING_ROUTE,
-  mockEmptyGeocoding,
-  mockForecast,
-  mockGeocoding,
-  type RouteFailure
-} from './support/weatherRoutes';
+import { failRoute, FORECAST_ROUTE, HAMBURG_COORDINATES, mockForecast, type RouteFailure } from './support/weatherRoutes';
 import { UNKNOWN_CONDITION, WEATHER_CONDITIONS, WEATHER_REFRESH_INTERVAL_MS } from '@renderer/weather/weatherConstants';
 import type { Settings } from '@shared/settings';
 
@@ -32,20 +23,20 @@ const TEMPERATURE_SUFFIX = '°';
 const LATITUDE_PARAMETER = 'latitude';
 const LONGITUDE_PARAMETER = 'longitude';
 const CITY = 'Hamburg';
-const CACHED_CITY = 'Lübeck';
+const STORED_CITY = 'Lübeck';
+const UNKNOWN_CITY = 'Nirgendwoheim';
 const UNKNOWN_WEATHER_CODE = 42;
 const OVERCAST_CODE = 3;
 const OVERCAST_LABEL = 'Bedeckt';
 const RAW_TEMPERATURE = 18.6;
 const ROUNDED_TEMPERATURE = '19';
-const CITY_PREFIX = 'Stadt ';
-const GEOCODING_WARNING = 'weather geocoding failed';
 const FORECAST_WARNING = 'weather fetch failed';
 const FAILURES: RouteFailure[] = ['serverError', 'networkError'];
+const CONDITION_CITIES = ['Hamburg', 'Berlin', 'München', 'Köln', 'Frankfurt am Main', 'Stuttgart', 'Düsseldorf', 'Leipzig', 'Dresden', 'Hannover'];
 
-const CACHED_SETTINGS: Partial<Settings> = {
-  weatherCity: CACHED_CITY,
-  weatherLocation: { city: CACHED_CITY, name: CACHED_CITY, ...DEFAULT_COORDINATES }
+const STORED_SETTINGS: Partial<Settings> = {
+  weatherCity: STORED_CITY,
+  weatherLocation: { city: STORED_CITY, name: STORED_CITY, latitude: 53.87, longitude: 10.69 }
 };
 
 const CONDITION_CASES = [
@@ -77,8 +68,7 @@ test('keeps the badge hidden without a configured city', async ({ calendar: { pa
   expect(forecastUrls).toHaveLength(0);
 });
 
-test('saving a city geocodes it and renders the current weather', async ({ calendar: { page, userData } }) => {
-  const requestedCities = await mockGeocoding(page);
+test('saving a picked city renders the current weather for its coordinates', async ({ calendar: { page, userData } }) => {
   const forecastUrls = await mockForecast(page, { temperature: RAW_TEMPERATURE, code: OVERCAST_CODE });
   await saveSettings(page, { city: CITY });
 
@@ -90,15 +80,13 @@ test('saving a city geocodes it and renders the current weather', async ({ calen
   await expect(badge).toHaveAttribute(TITLE_ATTRIBUTE, label);
   await expect(badge.locator(SELECTORS.ICON_SVG)).toHaveCount(1);
 
-  expect(requestedCities).toEqual([CITY]);
   const [forecastUrl] = forecastUrls;
-  expect(forecastUrl.searchParams.get(LATITUDE_PARAMETER)).toBe(String(DEFAULT_COORDINATES.latitude));
-  expect(forecastUrl.searchParams.get(LONGITUDE_PARAMETER)).toBe(String(DEFAULT_COORDINATES.longitude));
-  await expect.poll(() => readStoredSettings(userData).weatherLocation).toEqual({ city: CITY, name: CITY, ...DEFAULT_COORDINATES });
+  expect(forecastUrl.searchParams.get(LATITUDE_PARAMETER)).toBe(String(HAMBURG_COORDINATES.latitude));
+  expect(forecastUrl.searchParams.get(LONGITUDE_PARAMETER)).toBe(String(HAMBURG_COORDINATES.longitude));
+  await expect.poll(() => readStoredSettings(userData).weatherLocation).toEqual({ city: CITY, name: CITY, ...HAMBURG_COORDINATES });
 });
 
 test('skips a focus refresh within the stale time', async ({ calendar: { page } }) => {
-  await mockGeocoding(page);
   const forecastUrls = await mockForecast(page, { temperature: RAW_TEMPERATURE, code: OVERCAST_CODE });
   await saveSettings(page, { city: CITY });
   await expect(page.locator(SELECTORS.BADGE)).toBeVisible();
@@ -109,12 +97,11 @@ test('skips a focus refresh within the stale time', async ({ calendar: { page } 
 });
 
 test('resolves every weather condition group including unknown codes', async ({ calendar: { page } }) => {
-  await mockGeocoding(page);
   const forecast = { temperature: RAW_TEMPERATURE, code: OVERCAST_CODE };
   await mockForecast(page, forecast);
 
   for (const [index, { code, label }] of CONDITION_CASES.entries()) {
-    const city = CITY_PREFIX + index;
+    const city = CONDITION_CITIES[index];
     forecast.code = code;
     await saveSettings(page, { city });
     await expect(page.locator(SELECTORS.LABEL)).toHaveText(expectedLabel(label, city));
@@ -122,12 +109,11 @@ test('resolves every weather condition group including unknown codes', async ({ 
   }
 });
 
-test('keeps the badge hidden when the city is not found', async ({ calendar: { page, userData } }) => {
-  await mockEmptyGeocoding(page);
+test('keeps the badge hidden when the city is not in the catalog', async ({ calendar: { page, userData } }) => {
   const forecastUrls = await mockForecast(page, { temperature: RAW_TEMPERATURE, code: OVERCAST_CODE });
-  await saveSettings(page, { city: CITY });
+  await saveSettings(page, { city: UNKNOWN_CITY, pickSuggestion: false });
 
-  await expect.poll(() => readStoredSettings(userData).weatherCity).toBe(CITY);
+  await expect.poll(() => readStoredSettings(userData).weatherCity).toBe(UNKNOWN_CITY);
   await dispatchWindowFocus(page);
   await expect(page.locator(SELECTORS.BADGE)).toBeHidden();
   expect(readStoredSettings(userData).weatherLocation).toBeNull();
@@ -135,19 +121,7 @@ test('keeps the badge hidden when the city is not found', async ({ calendar: { p
 });
 
 for (const failure of FAILURES) {
-  test('keeps the badge hidden when geocoding fails with a ' + failure, async ({ calendar: { page } }) => {
-    await failRoute(page, GEOCODING_ROUTE, failure);
-    const forecastUrls = await mockForecast(page, { temperature: RAW_TEMPERATURE, code: OVERCAST_CODE });
-    const warning = waitForWarning(page, GEOCODING_WARNING);
-    await saveSettings(page, { city: CITY });
-    await warning;
-
-    await expect(page.locator(SELECTORS.BADGE)).toBeHidden();
-    expect(forecastUrls).toHaveLength(0);
-  });
-
   test('keeps the badge hidden when the forecast fails with a ' + failure, async ({ calendar: { page, userData } }) => {
-    await mockGeocoding(page);
     await failRoute(page, FORECAST_ROUTE, failure);
     const warning = waitForWarning(page, FORECAST_WARNING);
     await saveSettings(page, { city: CITY });
@@ -158,30 +132,27 @@ for (const failure of FAILURES) {
   });
 }
 
-test.describe('with a cached location', () => {
-  test.use({ calendarLaunch: { ...DEFAULT_LAUNCH_OPTIONS, settings: CACHED_SETTINGS } });
+test.describe('with a stored location', () => {
+  test.use({ calendarLaunch: { ...DEFAULT_LAUNCH_OPTIONS, settings: STORED_SETTINGS } });
 
-  test('uses the cached location of the same city without geocoding', async ({ calendar: { page } }) => {
-    const requestedCities = await mockGeocoding(page);
+  test('fetches the weather for the stored location on start', async ({ calendar: { page } }) => {
     const forecastUrls = await mockForecast(page, { temperature: RAW_TEMPERATURE, code: OVERCAST_CODE });
     await page.reload();
 
-    await expect(page.locator(SELECTORS.LABEL)).toHaveText(expectedLabel(OVERCAST_LABEL, CACHED_CITY));
-    expect(requestedCities).toHaveLength(0);
+    await expect(page.locator(SELECTORS.LABEL)).toHaveText(expectedLabel(OVERCAST_LABEL, STORED_CITY));
     expect(forecastUrls).toHaveLength(1);
   });
 
   test('refreshes the weather on the periodic interval', async ({ calendar: { page } }) => {
-    await mockGeocoding(page);
     const forecast = { temperature: RAW_TEMPERATURE, code: OVERCAST_CODE };
     const forecastUrls = await mockForecast(page, forecast);
     await page.clock.install();
     await page.reload();
-    await expect(page.locator(SELECTORS.LABEL)).toHaveText(expectedLabel(OVERCAST_LABEL, CACHED_CITY));
+    await expect(page.locator(SELECTORS.LABEL)).toHaveText(expectedLabel(OVERCAST_LABEL, STORED_CITY));
 
     forecast.code = UNKNOWN_WEATHER_CODE;
     await page.clock.runFor(WEATHER_REFRESH_INTERVAL_MS);
-    await expect(page.locator(SELECTORS.LABEL)).toHaveText(expectedLabel(UNKNOWN_CONDITION.label, CACHED_CITY));
+    await expect(page.locator(SELECTORS.LABEL)).toHaveText(expectedLabel(UNKNOWN_CONDITION.label, STORED_CITY));
     expect(forecastUrls).toHaveLength(2);
   });
 });

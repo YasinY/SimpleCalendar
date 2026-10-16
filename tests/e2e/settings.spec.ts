@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { DEFAULT_LAUNCH_OPTIONS, expect, test } from './support/calendarFixture';
-import { openSettings, saveSettings, SETTINGS_SELECTORS } from './support/settingsDialogActions';
-import { DEFAULT_COORDINATES, mockForecast, mockGeocoding } from './support/weatherRoutes';
+import { openSettings, saveSettings, SETTINGS_SELECTORS, typeCity } from './support/settingsDialogActions';
+import { HAMBURG_COORDINATES, mockForecast } from './support/weatherRoutes';
 import { PROJECT_ROOT } from './support/coveragePaths';
 import type { Settings } from '@shared/settings';
 import type { Theme } from '@shared/theme';
@@ -20,6 +20,19 @@ const SEEDED_CITY = 'Hamburg';
 const RAW_CITY = '  Berlin  ';
 const TRIMMED_CITY = 'Berlin';
 const EMPTY_CITY = '';
+const CITY_QUERY = 'Hamb';
+const AMBIGUOUS_QUERY = 'Neustadt';
+const UNKNOWN_QUERY = 'Nirgendwoheim';
+const ESCAPE_KEY = 'Escape';
+const ARROW_DOWN_KEY = 'ArrowDown';
+const ARROW_UP_KEY = 'ArrowUp';
+const ENTER_KEY = 'Enter';
+const HAMBURG_DETAILS = 'Hamburg, Deutschland';
+const MAX_SUGGESTIONS = 8;
+const SUGGESTION_ATTRIBUTE = 'aria-expanded';
+const EXPANDED = 'true';
+const COLLAPSED = 'false';
+const KEEP_TEXT = false;
 const FORECAST = { temperature: 12, code: 0 };
 const TRANSITION_LOG_KEY = 'settingsTransitionLog';
 const SETTINGS_ICON = SETTINGS_SELECTORS.OPEN_BUTTON + ' svg';
@@ -99,8 +112,7 @@ for (const { theme, background } of THEME_CASES) {
   });
 }
 
-test('trims the city before saving and shows the trimmed value when reopening', async ({ calendar: { page, userData } }) => {
-  await mockGeocoding(page);
+test('stores the picked city name instead of the raw text', async ({ calendar: { page, userData } }) => {
   await mockForecast(page, FORECAST);
   await saveSettings(page, { city: RAW_CITY });
 
@@ -141,7 +153,7 @@ test.describe('with a configured city', () => {
         holidayRegion: HOLIDAY_REGION,
         theme: THEMES.DARK,
         weatherCity: SEEDED_CITY,
-        weatherLocation: { city: SEEDED_CITY, name: SEEDED_CITY, ...DEFAULT_COORDINATES }
+        weatherLocation: { city: SEEDED_CITY, name: SEEDED_CITY, ...HAMBURG_COORDINATES }
       }
     }
   });
@@ -192,5 +204,49 @@ test.describe('animation', () => {
     await expect(page.locator(SETTINGS_SELECTORS.OVERLAY)).toBeHidden();
 
     expect(await readTransitionLog(page)).toEqual([]);
+  });
+});
+
+test.describe('city suggestions', () => {
+  test('suggests matching cities with region and country while typing', async ({ calendar: { page } }) => {
+    await openSettings(page);
+    const cityInput = page.locator(SETTINGS_SELECTORS.CITY);
+    const options = page.locator(SETTINGS_SELECTORS.CITY_OPTION);
+
+    await cityInput.fill(CITY_QUERY);
+    await expect(page.locator(SETTINGS_SELECTORS.CITY_PICKER)).toBeVisible();
+    await expect(cityInput).toHaveAttribute(SUGGESTION_ATTRIBUTE, EXPANDED);
+    await expect(options.first().locator(SETTINGS_SELECTORS.CITY_OPTION_NAME)).toHaveText(SEEDED_CITY);
+    await expect(options.first().locator(SETTINGS_SELECTORS.CITY_OPTION_DETAILS)).toHaveText(HAMBURG_DETAILS);
+
+    await cityInput.fill(AMBIGUOUS_QUERY);
+    await expect(options).toHaveCount(MAX_SUGGESTIONS);
+
+    await cityInput.fill(UNKNOWN_QUERY);
+    await expect(page.locator(SETTINGS_SELECTORS.CITY_PICKER)).toBeHidden();
+    await expect(cityInput).toHaveAttribute(SUGGESTION_ATTRIBUTE, COLLAPSED);
+  });
+
+  test('picks a suggestion with the keyboard and closes the list with escape without closing the dialog', async ({ calendar: { page, userData } }) => {
+    await mockForecast(page, FORECAST);
+    await openSettings(page);
+    const cityInput = page.locator(SETTINGS_SELECTORS.CITY);
+
+    await cityInput.fill(CITY_QUERY);
+    await expect(page.locator(SETTINGS_SELECTORS.CITY_PICKER)).toBeVisible();
+    await page.keyboard.press(ESCAPE_KEY);
+    await expect(page.locator(SETTINGS_SELECTORS.CITY_PICKER)).toBeHidden();
+    await expect(page.locator(SETTINGS_SELECTORS.OVERLAY)).toBeVisible();
+
+    await typeCity(page, CITY_QUERY, KEEP_TEXT);
+    await page.keyboard.press(ARROW_DOWN_KEY);
+    await page.keyboard.press(ARROW_UP_KEY);
+    await page.keyboard.press(ENTER_KEY);
+    await expect(page.locator(SETTINGS_SELECTORS.OVERLAY)).toBeVisible();
+    await expect(cityInput).toHaveValue(SEEDED_CITY);
+
+    await page.locator(SETTINGS_SELECTORS.SUBMIT).click();
+    await expect(page.locator(WEATHER_BADGE)).toBeVisible();
+    await expect.poll(() => readStoredSettings(userData).weatherLocation?.name).toBe(SEEDED_CITY);
   });
 });

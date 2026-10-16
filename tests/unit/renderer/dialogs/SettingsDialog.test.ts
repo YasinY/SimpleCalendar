@@ -6,6 +6,7 @@ import { HIDDEN_ATTRIBUTE, THEME_OPTIONS, THEMES, VIEW_MODES } from '@renderer/c
 import { REGION_OPTIONS } from '@renderer/holidays/holidayConstants';
 import type { SelectOption } from '@renderer/selectOption';
 import type { Settings } from '@shared/settings';
+import type { WeatherLocation } from '@shared/weatherLocation';
 import { mountIndexDocument, requireById } from '@tests/support/indexDocument';
 
 const OVERLAY_ID = 'settingsOverlay';
@@ -13,6 +14,8 @@ const DISCARD_OVERLAY_ID = 'discardOverlay';
 const REGION = 'HH';
 const CITY = 'Hamburg';
 const PADDED_CITY = '  ' + CITY + '  ';
+const LOCATION: WeatherLocation = { city: CITY, name: CITY, latitude: 53.55, longitude: 9.99 };
+const NO_CITIES = async () => [];
 const APP_VERSION = '1.2.3';
 const VERSION_TEXT = 'SimpleCalendar ' + APP_VERSION;
 
@@ -53,7 +56,7 @@ function query<T extends Element>(root: HTMLElement, selector: string): T {
 function createFixture(): DialogFixture {
   const overlay = requireById(OVERLAY_ID);
   const onSave = vi.fn<(patch: SettingsPatch) => void>();
-  const dialog = new SettingsDialog(overlay, { onSave }, new DiscardPrompt(requireById(DISCARD_OVERLAY_ID)));
+  const dialog = new SettingsDialog(overlay, { onSave }, new DiscardPrompt(requireById(DISCARD_OVERLAY_ID)), { loadCities: NO_CITIES });
   return {
     dialog,
     overlay,
@@ -110,7 +113,16 @@ describe('SettingsDialog', () => {
     form.dispatchEvent(submitEvent);
 
     expect(submitEvent.defaultPrevented).toBe(true);
-    expect(onSave).toHaveBeenCalledExactlyOnceWith({ holidayRegion: REGION, theme: THEMES.DARK, weatherCity: CITY, autoUpdate: true });
+    expect(onSave).toHaveBeenCalledExactlyOnceWith({ holidayRegion: REGION, theme: THEMES.DARK, weatherCity: CITY, weatherLocation: null, autoUpdate: true });
+  });
+
+  it('keeps the stored weather location while the city text is unchanged', () => {
+    const { dialog, form, onSave } = createFixture();
+    dialog.open({ ...SETTINGS, weatherLocation: LOCATION });
+
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+
+    expect(onSave).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ weatherCity: CITY, weatherLocation: LOCATION }));
   });
 
   it('shows the app version in the footer', () => {

@@ -1,9 +1,7 @@
 import type { WeatherIconName } from './weatherIconName';
 
-export const GEOCODING_ENDPOINT = 'https://geocoding-api.open-meteo.com/v1/search';
 export const FORECAST_ENDPOINT = 'https://api.open-meteo.com/v1/forecast';
 
-export const GEOCODING_PARAMS = { count: '1', language: 'de', format: 'json' } as const;
 export const FORECAST_PARAMS = { current: 'temperature_2m,weather_code', timezone: 'auto' } as const;
 
 export const WEATHER_REFRESH_INTERVAL_MS = 1800000;
