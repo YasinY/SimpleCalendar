@@ -33,7 +33,7 @@ interface MonthGridBounds {
   dayCount: number;
 }
 
-function pad(value: number): string {
+export function padTimePart(value: number): string {
   return String(value).padStart(TIME_PAD, PAD_CHARACTER);
 }
 
@@ -140,7 +140,7 @@ export function toMinutesOfDay(time: string): number {
 }
 
 export function formatMinutesOfDay(minutes: number): string {
-  return pad(Math.floor(minutes / MINUTES_PER_HOUR)) + TIME_SEPARATOR + pad(minutes % MINUTES_PER_HOUR);
+  return padTimePart(Math.floor(minutes / MINUTES_PER_HOUR)) + TIME_SEPARATOR + padTimePart(minutes % MINUTES_PER_HOUR);
 }
 
 export function getMinutesOfDay(date: Date): number {

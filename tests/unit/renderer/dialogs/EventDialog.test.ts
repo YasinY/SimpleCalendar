@@ -56,6 +56,7 @@ const SELECTORS = {
   ALL_DAY_INPUT: '[data-dialog-all-day]',
   MULTI_DAY_INPUT: '[data-dialog-multi-day]',
   DATE_PICKER: '[data-date-picker]',
+  TIME_PICKER_TRIGGER: '[data-time-picker-trigger]',
   RECURRENCE_SELECT: '[data-dialog-recurrence]',
   RECURRENCE_DETAILS: '[data-dialog-recurrence-details]',
   INTERVAL_INPUT: '[data-dialog-interval]',
@@ -98,6 +99,10 @@ interface DialogFixture {
 
 function query<T extends Element>(root: HTMLElement, selector: string): T {
   return root.querySelector(selector) as T;
+}
+
+function timePickerTriggers(fixture: DialogFixture): HTMLButtonElement[] {
+  return Array.from(fixture.overlay.querySelectorAll<HTMLButtonElement>(SELECTORS.TIME_PICKER_TRIGGER));
 }
 
 function createFixture(): DialogFixture {
@@ -386,6 +391,13 @@ describe('EventDialog', () => {
 
     expect(fixture.timeInput.disabled).toBe(true);
     expect(fixture.endTimeInput.disabled).toBe(true);
+    expect(timePickerTriggers(fixture).map((trigger) => trigger.disabled)).toEqual([true, true]);
+
+    fixture.allDayInput.checked = false;
+    fixture.allDayInput.dispatchEvent(new Event(CHANGE_EVENT));
+
+    expect(fixture.timeInput.disabled).toBe(false);
+    expect(timePickerTriggers(fixture).map((trigger) => trigger.disabled)).toEqual([false, false]);
   });
 
   it('hides and resets the active event on close', () => {

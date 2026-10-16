@@ -34,6 +34,11 @@ const SELECTORS = {
   TITLE: '[data-dialog-title]',
   TIME: '[data-dialog-time]',
   END_TIME: '[data-dialog-end-time]',
+  TIME_FIELD: '.field--time',
+  START_TIME_TRIGGER: '[popovertarget="startTimePicker"]',
+  START_TIME_PICKER: '#startTimePicker',
+  END_TIME_TRIGGER: '[popovertarget="endTimePicker"]',
+  END_TIME_PICKER: '#endTimePicker',
   END_DATE: '[data-dialog-end-date]',
   END_DATE_FIELD: '[data-dialog-end-date-field]',
   END_DATE_TRIGGER: '[data-dialog-end-date-field] [data-date-picker-trigger]',
@@ -115,6 +120,26 @@ const PICKER = {
 
 function pickerDay(picker: Locator, isoDate: string): Locator {
   return picker.locator('.date-picker__day[data-date="' + isoDate + '"]');
+}
+
+const TIME_PICKER = {
+  COLUMN: '.time-picker__column',
+  OPTION: '.time-picker__option',
+  SELECTED: '.time-picker__option--selected',
+  HOUR: '14',
+  MINUTE: '30',
+  HOUR_ONLY: '14:00',
+  FULL: '14:30',
+  FALLBACK_HOUR: '09:30',
+  INITIAL_SELECTION: ['09', '00'],
+  PICKED_SELECTION: ['14', '30']
+} as const;
+const TIME_COLUMN = { HOURS: 0, MINUTES: 1 } as const;
+const OPACITY = { FADED: '0.4', FULL: '1' } as const;
+const OPACITY_PROPERTY = 'opacity';
+
+function timeOption(picker: Locator, columnIndex: number, value: string): Locator {
+  return picker.locator(TIME_PICKER.COLUMN).nth(columnIndex).locator(TIME_PICKER.OPTION + '[data-value="' + value + '"]');
 }
 const EMPTY_INTERVAL = '';
 const DEFAULT_INTERVAL = '1';
@@ -289,15 +314,65 @@ test.describe('creating events', () => {
     await allDay.check();
     await expect(page.locator(SELECTORS.TIME)).toBeDisabled();
     await expect(page.locator(SELECTORS.END_TIME)).toBeDisabled();
+    await expect(page.locator(SELECTORS.START_TIME_TRIGGER)).toBeDisabled();
+    await expect(page.locator(SELECTORS.TIME_FIELD).first()).toHaveCSS(OPACITY_PROPERTY, OPACITY.FADED);
     await allDay.uncheck();
     await expect(page.locator(SELECTORS.TIME)).toBeEnabled();
     await expect(page.locator(SELECTORS.END_TIME)).toBeEnabled();
+    await expect(page.locator(SELECTORS.START_TIME_TRIGGER)).toBeEnabled();
+    await expect(page.locator(SELECTORS.TIME_FIELD).first()).toHaveCSS(OPACITY_PROPERTY, OPACITY.FULL);
     await allDay.check();
     await submitDialog(page);
 
     await expect(eventPill(page, ALL_DAY_TITLE).locator(SELECTORS.EVENT_TIME)).toHaveText(LABELS.ALL_DAY);
     const [stored] = await eventsOfToday(page);
     expect(stored).toMatchObject({ title: ALL_DAY_TITLE, time: ALL_DAY_TIME, endTime: null, allDay: true });
+  });
+
+  test('picks the start time from the custom time picker', async ({ calendar: { page } }) => {
+    await openCreateDialog(page);
+    const trigger = page.locator(SELECTORS.START_TIME_TRIGGER);
+    const picker = page.locator(SELECTORS.START_TIME_PICKER);
+    const timeInput = page.locator(SELECTORS.TIME);
+
+    await trigger.click();
+    await expect(picker).toBeVisible();
+    await expect(picker.locator(TIME_PICKER.SELECTED)).toHaveText([...TIME_PICKER.INITIAL_SELECTION]);
+    await timeOption(picker, TIME_COLUMN.HOURS, TIME_PICKER.HOUR).click();
+    await expect(timeInput).toHaveValue(TIME_PICKER.HOUR_ONLY);
+    await expect(picker).toBeVisible();
+    await timeOption(picker, TIME_COLUMN.MINUTES, TIME_PICKER.MINUTE).click();
+    await expect(picker).toBeHidden();
+    await expect(timeInput).toHaveValue(TIME_PICKER.FULL);
+    await expect(trigger).toBeFocused();
+
+    await trigger.click();
+    await expect(picker.locator(TIME_PICKER.SELECTED)).toHaveText([...TIME_PICKER.PICKED_SELECTION]);
+    await page.keyboard.press(ESCAPE_KEY);
+    await expect(picker).toBeHidden();
+    await expect(page.locator(SELECTORS.OVERLAY)).toBeVisible();
+    await expect(trigger).toBeFocused();
+  });
+
+  test('falls back to the default hour and zero minutes when the end time is empty', async ({ calendar: { page } }) => {
+    await openCreateDialog(page);
+    const trigger = page.locator(SELECTORS.END_TIME_TRIGGER);
+    const picker = page.locator(SELECTORS.END_TIME_PICKER);
+    const endTimeInput = page.locator(SELECTORS.END_TIME);
+
+    await trigger.click();
+    await expect(picker).toBeVisible();
+    await expect(picker.locator(TIME_PICKER.SELECTED)).toHaveCount(0);
+    await timeOption(picker, TIME_COLUMN.MINUTES, TIME_PICKER.MINUTE).click();
+    await expect(picker).toBeHidden();
+    await expect(endTimeInput).toHaveValue(TIME_PICKER.FALLBACK_HOUR);
+
+    await endTimeInput.fill(NO_VALUE);
+    await trigger.click();
+    await timeOption(picker, TIME_COLUMN.HOURS, TIME_PICKER.HOUR).click();
+    await expect(endTimeInput).toHaveValue(TIME_PICKER.HOUR_ONLY);
+    await page.keyboard.press(ESCAPE_KEY);
+    await expect(picker).toBeHidden();
   });
 
   test('drops an end time that lies before the start time', async ({ calendar: { page } }) => {

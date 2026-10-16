@@ -17,6 +17,7 @@ import { fillSelect } from '@renderer/dom/selectOptions';
 import { DEFAULT_EVENT_COLOR, resolveEventColor } from '@renderer/events/eventColors';
 import { buildColorSwatches } from './colorSwatches';
 import { attachDatePickers } from './datePicker/attachDatePickers';
+import { attachTimePickers } from './timePicker/attachTimePickers';
 import { DialogOverlay } from './DialogOverlay';
 import type { DiscardPrompt } from './DiscardPrompt';
 import {
@@ -31,6 +32,7 @@ import {
 } from './eventFormValues';
 import type { EventDialogHandlers } from './eventDialogHandlers';
 import type { EventEditor } from './eventEditor';
+import type { TimePicker } from './timePicker/TimePicker';
 import type { CalendarEvent } from '@shared/calendarEvent';
 import type { EventInput } from '@shared/eventInput';
 import type { RecurrenceFrequency } from '@shared/recurrenceFrequency';
@@ -87,6 +89,7 @@ export class EventDialog implements EventEditor {
   readonly #submitButton: HTMLButtonElement;
   readonly #deleteButton: HTMLButtonElement;
   readonly #handlers: EventDialogHandlers;
+  readonly #timePickers: TimePicker[];
   #activeDate: string | null = null;
   #activeEvent: CalendarEvent | null = null;
 
@@ -121,6 +124,7 @@ export class EventDialog implements EventEditor {
     fillSelect(this.#recurrenceSelect, RECURRENCE_OPTIONS);
     buildColorSwatches(this.#colorGroup);
     attachDatePickers(overlayElement);
+    this.#timePickers = attachTimePickers(overlayElement);
     this.#bindInteractions();
   }
 
@@ -190,8 +194,7 @@ export class EventDialog implements EventEditor {
 
   #applyAllDayState(): void {
     const allDay = this.#allDayInput.checked;
-    this.#timeInput.disabled = allDay;
-    this.#endTimeInput.disabled = allDay;
+    for (const picker of this.#timePickers) picker.disabled = allDay;
   }
 
   #applyMultiDayState(): void {

@@ -55,15 +55,27 @@
       </label>
 
       <div class="field-row">
-        <label class="field">
-          <span class="field__label">Von</span>
-          <input class="field__input" type="time" data-dialog-time value="09:00">
-        </label>
+        <div class="field field--time">
+          <label class="field__label" for="eventStartTime">Von</label>
+          <div class="picker-field" data-time-field>
+            <input class="field__input field__input--picker" id="eventStartTime" type="time" data-dialog-time value="09:00">
+            <button type="button" class="picker-field__trigger" popovertarget="startTimePicker" data-time-picker-trigger aria-label="Uhrzeit wählen" title="Uhrzeit wählen">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            </button>
+            <div class="picker time-picker" id="startTimePicker" popover data-time-picker></div>
+          </div>
+        </div>
 
-        <label class="field">
-          <span class="field__label">Bis (optional)</span>
-          <input class="field__input" type="time" data-dialog-end-time>
-        </label>
+        <div class="field field--time">
+          <label class="field__label" for="eventEndTime">Bis (optional)</label>
+          <div class="picker-field" data-time-field>
+            <input class="field__input field__input--picker" id="eventEndTime" type="time" data-dialog-end-time>
+            <button type="button" class="picker-field__trigger" popovertarget="endTimePicker" data-time-picker-trigger aria-label="Uhrzeit wählen" title="Uhrzeit wählen">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            </button>
+            <div class="picker time-picker" id="endTimePicker" popover data-time-picker></div>
+          </div>
+        </div>
       </div>
 
       <div class="checkbox-row">
@@ -81,12 +93,12 @@
         <div class="reveal__content">
           <div class="field">
             <label class="field__label" for="eventEndDate">Enddatum</label>
-            <div class="date-field" data-date-field>
-              <input class="field__input field__input--date" id="eventEndDate" type="date" data-dialog-end-date>
-              <button type="button" class="date-field__trigger" popovertarget="endDatePicker" data-date-picker-trigger aria-label="Datum wählen" title="Datum wählen">
+            <div class="picker-field" data-date-field>
+              <input class="field__input field__input--picker" id="eventEndDate" type="date" data-dialog-end-date>
+              <button type="button" class="picker-field__trigger" popovertarget="endDatePicker" data-date-picker-trigger aria-label="Datum wählen" title="Datum wählen">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
               </button>
-              <div class="date-picker" id="endDatePicker" popover data-date-picker></div>
+              <div class="picker date-picker" id="endDatePicker" popover data-date-picker></div>
             </div>
           </div>
         </div>
@@ -110,12 +122,12 @@
 
             <div class="field">
               <label class="field__label" for="eventUntil">Endet am (optional)</label>
-              <div class="date-field" data-date-field>
-                <input class="field__input field__input--date" id="eventUntil" type="date" data-dialog-until>
-                <button type="button" class="date-field__trigger" popovertarget="untilDatePicker" data-date-picker-trigger aria-label="Datum wählen" title="Datum wählen">
+              <div class="picker-field" data-date-field>
+                <input class="field__input field__input--picker" id="eventUntil" type="date" data-dialog-until>
+                <button type="button" class="picker-field__trigger" popovertarget="untilDatePicker" data-date-picker-trigger aria-label="Datum wählen" title="Datum wählen">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
                 </button>
-                <div class="date-picker" id="untilDatePicker" popover data-date-picker></div>
+                <div class="picker date-picker" id="untilDatePicker" popover data-date-picker></div>
               </div>
             </div>
           </div>

@@ -1,19 +1,17 @@
 import {
   DATE_DATASET_KEY,
   DATE_PICKER_CLASSES,
-  DATE_PICKER_EVENTS,
   DATE_PICKER_GLYPHS,
   DATE_PICKER_LABELS,
   DATE_PICKER_SELECTORS,
   NEXT_MONTH_STEP,
-  NOT_FOCUSABLE_BY_TAB,
-  POPOVER_OPEN_STATE,
   PREVIOUS_MONTH_STEP,
   TITLE_SEPARATOR
 } from './datePickerConstants';
-import { ESCAPE_KEY, NO_DATE, TRANSITION_DIRECTIONS, WEEKDAY_LABELS, type TransitionDirection } from '@renderer/constants';
+import { PopoverField } from '../popover/PopoverField';
+import { NO_DATE, TRANSITION_DIRECTIONS, WEEKDAY_LABELS, type TransitionDirection } from '@renderer/constants';
 import { addMonths, buildMonthGrid, fromIsoDate, getMonthTitle, startOfMonth, toIsoDate } from '@renderer/date/dateUtils';
-import { createElement, requireElement } from '@renderer/dom/elements';
+import { createElement } from '@renderer/dom/elements';
 import { runWithTransition } from '@renderer/dom/transitions';
 import type { MonthCell } from '@renderer/date/monthCell';
 
@@ -27,45 +25,26 @@ function createButton(className: string, text: string, label?: string): HTMLButt
   return button;
 }
 
-export class DatePicker {
-  readonly #input: HTMLInputElement;
-  readonly #trigger: HTMLButtonElement;
-  readonly #popover: HTMLElement;
+export class DatePicker extends PopoverField {
   #viewMonth: Date = startOfMonth(new Date());
 
   constructor(field: HTMLElement) {
-    this.#input = requireElement(field, DATE_PICKER_SELECTORS.INPUT);
-    this.#trigger = requireElement(field, DATE_PICKER_SELECTORS.TRIGGER);
-    this.#popover = requireElement(field, DATE_PICKER_SELECTORS.POPOVER);
-    this.#popover.tabIndex = NOT_FOCUSABLE_BY_TAB;
-    this.#bindInteractions();
+    super(field, DATE_PICKER_SELECTORS);
   }
 
-  #bindInteractions(): void {
-    this.#popover.addEventListener(DATE_PICKER_EVENTS.TOGGLE, (domEvent) => {
-      if ((domEvent as ToggleEvent).newState !== POPOVER_OPEN_STATE) return;
-      this.#open();
-    });
-    this.#popover.addEventListener('keydown', (domEvent) => {
-      if (domEvent.key !== ESCAPE_KEY) return;
-      domEvent.stopPropagation();
-      this.#trigger.focus();
-    });
-  }
-
-  #open(): void {
+  protected open(): void {
     this.#viewMonth = startOfMonth(this.#initialDate());
     this.#render();
-    this.#popover.focus();
+    this.popover.focus();
   }
 
   #initialDate(): Date {
-    const anchor = this.#input.value || this.#input.min;
+    const anchor = this.input.value || this.input.min;
     return anchor ? fromIsoDate(anchor) : new Date();
   }
 
   #render(): void {
-    this.#popover.replaceChildren(this.#buildHeader(), this.#buildWeekdays(), this.#buildGrid(), this.#buildFooter());
+    this.popover.replaceChildren(this.#buildHeader(), this.#buildWeekdays(), this.#buildGrid(), this.#buildFooter());
   }
 
   #buildHeader(): HTMLElement {
@@ -98,7 +77,7 @@ export class DatePicker {
     button.dataset[DATE_DATASET_KEY] = cell.iso;
     button.classList.toggle(DATE_PICKER_CLASSES.DAY_OUTSIDE, !cell.isCurrentMonth);
     button.classList.toggle(DATE_PICKER_CLASSES.DAY_TODAY, cell.isToday);
-    button.classList.toggle(DATE_PICKER_CLASSES.DAY_SELECTED, cell.iso === this.#input.value);
+    button.classList.toggle(DATE_PICKER_CLASSES.DAY_SELECTED, cell.iso === this.input.value);
     button.disabled = this.#isBeforeMinimum(cell.iso);
     button.addEventListener('click', () => this.#select(cell.iso));
     return button;
@@ -115,7 +94,7 @@ export class DatePicker {
   }
 
   #isBeforeMinimum(isoDate: string): boolean {
-    const minimum = this.#input.min;
+    const minimum = this.input.min;
     return minimum !== NO_DATE && isoDate < minimum;
   }
 
@@ -125,15 +104,7 @@ export class DatePicker {
   }
 
   #select(isoDate: string): void {
-    const input = this.#input;
-    input.value = isoDate;
-    input.dispatchEvent(new Event(DATE_PICKER_EVENTS.INPUT, { bubbles: true }));
-    input.dispatchEvent(new Event(DATE_PICKER_EVENTS.CHANGE, { bubbles: true }));
-    this.#close();
-  }
-
-  #close(): void {
-    this.#popover.hidePopover?.();
-    this.#trigger.focus();
+    this.commit(isoDate);
+    this.close();
   }
 }

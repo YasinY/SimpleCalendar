@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, nativeTheme, Notification } from 'electron
 import {
   APP_LOCALE,
   APP_USER_MODEL_ID,
+  DEVELOPMENT_APP_USER_MODEL_ID,
   HIDDEN_LAUNCH_FLAG,
   NOTIFICATION_BODY_SEPARATOR,
   NOTIFICATION_BODY_SUFFIX,
@@ -60,7 +61,7 @@ export class MainApplication {
   }
 
   #bootstrap(): void {
-    app.setAppUserModelId(APP_USER_MODEL_ID);
+    app.setAppUserModelId(app.isPackaged ? APP_USER_MODEL_ID : DEVELOPMENT_APP_USER_MODEL_ID);
     this.#registerAutostart();
 
     const storage = openStorage(app.getPath('userData'));

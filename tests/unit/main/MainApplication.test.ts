@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { APP_USER_MODEL_ID, HIDDEN_LAUNCH_FLAG, RENDERER_ENTRY_PATH, THEME_BACKGROUNDS } from '@main/constants';
+import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, HIDDEN_LAUNCH_FLAG, RENDERER_ENTRY_PATH, THEME_BACKGROUNDS } from '@main/constants';
 import { MainApplication } from '@main/MainApplication';
 import { openStorage } from '@main/storage/openStorage';
 import { IPC_CHANNELS } from '@shared/ipcChannels';
@@ -196,12 +196,20 @@ describe('MainApplication', () => {
   });
 
   describe('bootstrap', () => {
-    it('sets the app user model id and opens the storage in the user data path', async () => {
+    it('sets a development app user model id and opens the storage in the user data path', async () => {
+      await startApplication();
+
+      expect(fakeApp.setAppUserModelId).toHaveBeenCalledWith(DEVELOPMENT_APP_USER_MODEL_ID);
+      expect(fakeApp.getPath).toHaveBeenCalledWith(USER_DATA_PATH_NAME);
+      expect(openStorage).toHaveBeenCalledWith(USER_DATA_PATH);
+    });
+
+    it('sets the installer app user model id when the app is packaged', async () => {
+      fakeApp.isPackaged = true;
+
       await startApplication();
 
       expect(fakeApp.setAppUserModelId).toHaveBeenCalledWith(APP_USER_MODEL_ID);
-      expect(fakeApp.getPath).toHaveBeenCalledWith(USER_DATA_PATH_NAME);
-      expect(openStorage).toHaveBeenCalledWith(USER_DATA_PATH);
     });
 
     it('does not register autostart when the app is not packaged', async () => {

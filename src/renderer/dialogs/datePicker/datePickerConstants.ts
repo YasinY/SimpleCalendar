@@ -1,9 +1,11 @@
+import type { PopoverFieldSelectors } from '../popover/popoverFieldSelectors';
+
 export const DATE_PICKER_SELECTORS = {
   FIELD: '[data-date-field]',
   INPUT: 'input[type="date"]',
   TRIGGER: '[data-date-picker-trigger]',
   POPOVER: '[data-date-picker]'
-} as const;
+} as const satisfies PopoverFieldSelectors & { FIELD: string };
 
 export const DATE_PICKER_CLASSES = {
   HEADER: 'date-picker__header',
@@ -32,15 +34,7 @@ export const DATE_PICKER_GLYPHS = {
   NEXT: '›'
 } as const;
 
-export const DATE_PICKER_EVENTS = {
-  TOGGLE: 'toggle',
-  INPUT: 'input',
-  CHANGE: 'change'
-} as const;
-
-export const POPOVER_OPEN_STATE = 'open';
 export const DATE_DATASET_KEY = 'date';
 export const PREVIOUS_MONTH_STEP = -1;
 export const NEXT_MONTH_STEP = 1;
 export const TITLE_SEPARATOR = ' ';
-export const NOT_FOCUSABLE_BY_TAB = -1;
